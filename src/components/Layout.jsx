@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useFileTree } from '../hooks/useVault'
+import { SITE } from '../config'
 
 export default function Layout() {
   const { tree } = useFileTree()
@@ -17,7 +18,9 @@ export default function Layout() {
   }
 
   const articleCount = tree ? tree.length : '...'
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
 
   return (
     <div className="layout">
@@ -27,13 +30,23 @@ export default function Layout() {
 
       <aside className={'sidebar ' + (sidebarOpen ? 'open' : '')}>
         <div className="sidebar-logo">
-          <Link to="/"><div className="wordmark">Dripwiki</div><div className="subtitle">The Free Encyclopedia</div></Link>
+          <Link to="/">
+            <div className="wordmark">{SITE.name}</div>
+            <div className="subtitle">{SITE.tagline}</div>
+          </Link>
         </div>
+
         <div className="sidebar-search">
           <form onSubmit={handleSearch}>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search articles..." type="search" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search articles..."
+              type="search"
+            />
           </form>
         </div>
+
         <nav className="sidebar-nav">
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-label">Navigation</div>
@@ -55,12 +68,16 @@ export default function Layout() {
             <Link to="/browse?type=organization">Organizations</Link>
           </div>
         </nav>
-        <div className="sidebar-footer">{articleCount} articles<br/>github.com/Switz-000/dripwiki</div>
+
+        <div className="sidebar-footer">
+          {articleCount} articles<br />
+          {SITE.footer}
+        </div>
       </aside>
 
       <main className="main-content">
         <div className="masthead">
-          <span>Dripwiki -- Encyclopedia of the Dripstan Continent</span>
+          <span>{SITE.masthead}</span>
           <span className="masthead-title">{today}</span>
         </div>
         <Outlet />

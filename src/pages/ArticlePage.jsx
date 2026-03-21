@@ -1,34 +1,44 @@
 import React, { useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { useArticle } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
+import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import { Loading, ErrorState } from '../components/Loading'
 
 export default function ArticlePage() {
-  const { slug } = useParams()
+  // With path="article/*", the slug lives in params['*']
+  const params = useParams()
+  const slug = params['*']
   const { article, loading, error } = useArticle(slug)
 
   useEffect(() => {
-    if (article) document.title = `${article.title} — Susia Encyclopedia`
-    return () => { document.title = 'Susia — Encyclopedia' }
+    if (article) {
+      document.title = `${article.title} — ${SITE.name}`
+    }
+    return () => { document.title = SITE.name }
   }, [article])
 
-  // Derive a friendly breadcrumb from the path
   function getBreadcrumb(path) {
     if (!path) return []
-    const parts = path.split('/').slice(0, -1) // drop filename
-    return parts.map(p => p.replace(/^\d+ - /, '')) // strip "01 - " prefixes
+    return path
+      .split('/')
+      .slice(0, -1)
+      .map(p => p.replace(/^\d+ - /, '').trim())
+      .filter(Boolean)
   }
 
   if (loading) return (
     <div className="page-inner">
-      <Loading message="Retrieving article from archive…" />
+      <Loading message="Retrieving article from archive..." />
     </div>
   )
 
   if (error) return (
     <div className="page-inner">
+      <div className="breadcrumb">
+        <Link to="/browse">Browse</Link>
+      </div>
       <ErrorState message={error} />
     </div>
   )
@@ -40,20 +50,16 @@ export default function ArticlePage() {
 
   return (
     <div className="page-inner">
-      {/* Breadcrumb */}
-      {crumbs.length > 0 && (
-        <div className="breadcrumb">
-          <Link to="/browse">Browse</Link>
-          {crumbs.map((c, i) => (
-            <React.Fragment key={i}>
-              <span className="sep">/</span>
-              <span>{c}</span>
-            </React.Fragment>
-          ))}
-        </div>
-      )}
+      <div className="breadcrumb">
+        <Link to="/browse">Browse</Link>
+        {crumbs.map((c, i) => (
+          <React.Fragment key={i}>
+            <span className="sep">/</span>
+            <span>{c}</span>
+          </React.Fragment>
+        ))}
+      </div>
 
-      {/* Article header */}
       <header className="article-header">
         {typeLabel && <div className="article-type-badge">{typeLabel}</div>}
         <h1 className="article-title">{article.title}</h1>
@@ -62,7 +68,6 @@ export default function ArticlePage() {
         )}
       </header>
 
-      {/* Infobox + body */}
       <div className="article-body">
         <Infobox meta={article.meta} title={article.title} />
         <div dangerouslySetInnerHTML={{ __html: article.html }} />

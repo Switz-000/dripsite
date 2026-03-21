@@ -12,7 +12,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="article/:slug" element={<ArticlePage />} />
+        {/* Use * so base64 slugs with any char are captured cleanly */}
+        <Route path="article/*" element={<ArticlePage />} />
         <Route path="browse" element={<BrowsePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="*" element={<NotFoundPage />} />

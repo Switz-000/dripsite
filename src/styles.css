@@ -283,3 +283,85 @@ a:visited { color: var(--link-visited); }
   .mobile-menu-btn { display: flex; position: fixed; top: 14px; left: 14px; z-index: 200; background: var(--bg-surface); border: 1px solid var(--border); width: 34px; height: 34px; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); font-size: 1rem; }
 }
 @media (min-width: 769px) { .mobile-menu-btn { display: none; } }
+
+/* ── Images from [[wikilinks]] ── */
+.article-body figure.wiki-image {
+  margin: 1.8em 0;
+  text-align: center;
+}
+
+.article-body figure.wiki-image img,
+.article-body img.wiki-image-inline {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  display: block;
+  margin: 0 auto;
+}
+
+.article-body figure.wiki-image figcaption {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+.article-body img.wiki-image-inline {
+  display: inline;
+  margin: 0 2px;
+  vertical-align: middle;
+  max-height: 1.4em;  /* keeps inline images from blowing up the line height */
+}
+
+.embed-placeholder {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  padding: 2px 6px;
+}
+
+/* ── Browse page additions ── */
+.browse-filter-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: none;
+  border-bottom: 2px solid var(--text-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 8px 0;
+  outline: none;
+  margin-bottom: 16px;
+  transition: border-color var(--transition);
+}
+.browse-filter-input:focus { border-bottom-color: var(--text-accent); }
+.browse-filter-input::placeholder { color: var(--text-muted); }
+
+.browse-count {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-top: 10px;
+}
+
+.browse-empty {
+  padding: 24px 0;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.87rem;
+  text-align: center;
+}
+
+/* ── Search page additions ── */
+.search-no-results,
+.search-hint {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.87rem;
+  margin-top: 8px;
+}
+.search-no-results em { font-style: italic; color: var(--text-secondary); }
