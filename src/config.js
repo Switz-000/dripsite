@@ -99,13 +99,13 @@ export const HOME_CATEGORIES = [
 //   text-accent:  '#c8a84b'
 //
 export const THEME = {
-  'bg':           '#0e0d0b',
-  'bg-surface':   '#151410',
+  'bg':           '#101418',
+  'bg-surface':   '#202122',
   'bg-elevated':  null,
-  'text-primary': '#e8e2d5',
+  'text-primary': '#dbd8d0',
   'text-secondary': null,
   'text-muted':   null,
-  'text-accent':  '#c8a84b',
+  'text-accent':  '#2e6de4',
   'link':         null,
   'link-hover':   null,
   'border':       null,
