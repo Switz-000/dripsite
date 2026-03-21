@@ -71,10 +71,10 @@ export const FEATURED_ARTICLES = [
 export const HOME_CATEGORIES = [
   { label: 'People',       desc: 'Presidents, philosophers, executives', path: '/browse?type=person'       },
   { label: 'Corporations', desc: 'Yarnojtes and major companies',         path: '/browse?type=company'      },
-  { label: 'Geography',    desc: 'States, cities, and territories',       path: '/browse?type=state'        },
-  { label: 'History',      desc: 'Wars, events, and eras',                path: '/browse?type=event'        },
-  { label: 'Law & Policy', desc: 'Legislation, treaties, doctrines',      path: '/browse?type=law'          },
-  { label: 'Culture',      desc: 'Philosophy, sport, tradition',          path: '/browse?type=concept'      },
+  { label: 'Geography',    desc: 'States, cities, and territories',       path: '/browse?type=state,country,city,fez'},
+  { label: 'History',      desc: 'Wars, events, and eras',                path: '/browse?type=event,war'        },
+  { label: 'Law & Policy', desc: 'Legislation, treaties, doctrines',      path: '/browse?type=law,institution,treaty,sport'},
+  { label: 'Culture',      desc: 'Philosophy, sport, tradition, religion',  path: '/browse?type=concept,tradition,religion,sport' },
 ]
 
 // ── Color theme ───────────────────────────────────────────────
@@ -99,13 +99,13 @@ export const HOME_CATEGORIES = [
 //   text-accent:  '#c8a84b'
 //
 export const THEME = {
-  'bg':           null,
-  'bg-surface':   null,
+  'bg':           '#0e0d0b',
+  'bg-surface':   '#151410',
   'bg-elevated':  null,
-  'text-primary': null,
+  'text-primary': '#e8e2d5',
   'text-secondary': null,
   'text-muted':   null,
-  'text-accent':  null,
+  'text-accent':  '#c8a84b',
   'link':         null,
   'link-hover':   null,
   'border':       null,

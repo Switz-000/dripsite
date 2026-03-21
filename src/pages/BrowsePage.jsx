@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useFileTree, pathToSlug } from '../hooks/useVault'
 import { Loading, ErrorState } from '../components/Loading'
@@ -14,6 +14,9 @@ const TYPE_FILTERS = [
   { label: 'Laws',          value: 'law'           },
   { label: 'Institutions',  value: 'institution'   },
   { label: 'Concepts',      value: 'concept'       },
+  { label: 'Traditions',    value: 'tradition'     },
+  { label: 'Religion',      value: 'religion'      },
+  { label: 'Sport',         value: 'sport'         },
   { label: 'Organizations', value: 'organization'  },
 ]
 
@@ -27,8 +30,12 @@ function guessTypeFromPath(path) {
   if (p.includes('/history/') || p.includes('/wars/')) return 'event'
   if (p.includes('/legislation/')) return 'law'
   if (p.includes('/federal/') || p.includes('/municipal/') || p.includes('/goverment/')) return 'institution'
-  if (p.includes('/culture/') || p.includes('/philosophy/')) return 'concept'
   if (p.includes('/organizations/') || p.includes('/parties/')) return 'organization'
+  // More specific culture sub-types before the broad 'concept' fallback
+  if (p.includes('/religion/')) return 'religion'
+  if (p.includes('/traditions/')) return 'tradition'
+  if (p.includes('/sport') || p.includes('crolball')) return 'sport'
+  if (p.includes('/culture/') || p.includes('/philosophy/') || p.includes('/expressions/')) return 'concept'
   return ''
 }
 
@@ -47,18 +54,26 @@ function cleanFolder(path) {
 export default function BrowsePage() {
   const { tree, loading, error } = useFileTree()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filter, setFilter]       = useState(searchParams.get('type') || '')
   const [localSearch, setLocalSearch] = useState('')
 
-  // Keep filter in sync with URL
-  useEffect(() => {
-    setFilter(searchParams.get('type') || '')
+  // filter is a Set of active type strings. Empty set = show all.
+  const activeTypes = useMemo(() => {
+    const raw = searchParams.get('type') || ''
+    return new Set(raw ? raw.split(',').filter(Boolean) : [])
   }, [searchParams])
 
   function handleFilter(value) {
-    setFilter(value)
-    if (value) setSearchParams({ type: value })
-    else setSearchParams({})
+    if (!value) {
+      // "All" button — clear everything
+      setSearchParams({})
+      return
+    }
+    const next = new Set(activeTypes)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+
+    if (next.size === 0) setSearchParams({})
+    else setSearchParams({ type: [...next].join(',') })
   }
 
   const items = useMemo(() => {
@@ -71,7 +86,7 @@ export default function BrowsePage() {
         type:   guessTypeFromPath(f.path),
       }))
       .filter(item => {
-        if (filter && item.type !== filter) return false
+        if (activeTypes.size > 0 && !activeTypes.has(item.type)) return false
         if (localSearch) {
           const q = localSearch.toLowerCase()
           return item.title.toLowerCase().includes(q) ||
@@ -80,7 +95,7 @@ export default function BrowsePage() {
         return true
       })
       .sort((a, b) => a.title.localeCompare(b.title))
-  }, [tree, filter, localSearch])
+  }, [tree, activeTypes, localSearch])
 
   if (loading) return <div className="page-inner"><Loading message="Loading article index..." /></div>
   if (error)   return <div className="page-inner"><ErrorState message={error} /></div>
@@ -100,7 +115,11 @@ export default function BrowsePage() {
           {TYPE_FILTERS.map(f => (
             <button
               key={f.value}
-              className={'filter-btn' + (filter === f.value ? ' active' : '')}
+              className={'filter-btn' + (
+                f.value === ''
+                  ? activeTypes.size === 0 ? ' active' : ''
+                  : activeTypes.has(f.value) ? ' active' : ''
+              )}
               onClick={() => handleFilter(f.value)}
             >
               {f.label}
