@@ -133,9 +133,24 @@ export const COUNTRIES = [
 // Vais preencher estes depois de ver o mapa no browser
 // São as coordenadas do viewBox quando se clica num país
 export const COUNTRY_VIEWBOXES = {
-  susia: '71.8 66.8 211.6 379.7', // ← vais ajustar depois
-  confia:  '260 119.5 266.5 204.9',
-  zaphonia:'256.7 289.8 285.5 185.',
+  susia:        '33 61 252 382',
+  confia:       '256 110 268 235',
+  zaphonia:     '252 287 277 199',
+  kapiogg:      '328 38 379 197',
+  pierej:       '478 166 228 175',
+  kamino:       '492 271 254 217',
+  astofayan:    '50 367 158 136',
+  ditania:      '288 422 106 82',
+  cabunire:     '355 420 103 110',
+  drippalia:    '238 64 178 85',
+  celiolaj:     '221 0 180 105',
+  garecija:     '178 471 123 92',
+  ariwaro:      '57 467 159 112',
+  chongzha:     '257 415 75 120',
+  balsheck:     '297 455 87 69',
+  yakiria:      '348 472 57 54',
+  macoshill:    '397 424 302 166',
+  'sutsa-fuhu': '158 368 131 137',
 }
 
 // ── States ────────────────────────────────────────────────────
