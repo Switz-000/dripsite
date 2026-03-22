@@ -204,9 +204,9 @@ export const CITIES = {
   ditania: {
     ditania: [
       { id: 'bermo',       label: 'Bermo',       cx: 342.0, cy: 451.9, size: 'major',  article: '05 - Ditania/03 - Geography/Cities/Bermo',       pop: '1,800,000', capital: true  },
-      { id: 'nar_maluni',  label: 'Nar Maluni',  cx: 0,     cy: 0,     size: 'medium', article: '05 - Ditania/03 - Geography/Cities/Nar Maluni',   pop: '810,000',   capital: false },
+      { id: 'nar_maluni',  label: 'Nar Maluni',  cx: 0,     cy: 0,     size: 'minor', article: '05 - Ditania/03 - Geography/Cities/Nar Maluni',   pop: '810,000',   capital: false },
       { id: 'nar_liewati', label: 'Nar Liewati', cx: 354.7, cy: 478.4, size: 'medium', article: '05 - Ditania/03 - Geography/Cities/Nar Liewati',  pop: '540,000',   capital: false },
-      { id: 'tonka',       label: 'Tonka',       cx: 354.8, cy: 463.7, size: 'minor',  article: '05 - Ditania/03 - Geography/Cities/Tonka',        pop: '220,000',   capital: false },
+      { id: 'tonka',       label: 'Tonka',       cx: 354.8, cy: 463.7, size: 'medium',  article: '05 - Ditania/03 - Geography/Cities/Tonka',        pop: '220,000',   capital: false },
       { id: 'nar_zintoro', label: 'Nar Zintoro', cx: 360.7, cy: 446.1, size: 'minor',  article: '05 - Ditania/03 - Geography/Cities/Nar Zintoro',  pop: null,        capital: false },
       { id: 'niran',       label: 'Niran',       cx: 368.7, cy: 466.4, size: 'minor',  article: '05 - Ditania/03 - Geography/Cities/Niran',        pop: null,        capital: false },
       { id: 'parho',       label: 'Parho',       cx: 323.2, cy: 464.9, size: 'minor',  article: '05 - Ditania/03 - Geography/Cities/Parho',        pop: null,        capital: false },
