@@ -167,6 +167,7 @@ export const STATES = {
     { id: 'nessel',       label: 'Nessel',       article: '01 - Susia/02 - Geography/States/Nessel',       capital: 'Kloshijie',      pop: null,         gdp: null      },
     { id: 'neutral_district', label: 'Neutral District', article: '01 - Susia/02 - Geography/States/Neutral District', capital: 'Soiteslaj', pop: '2,800,000', gdp: '220,000' },
   ],
+  ditania: [],
 }
 
 // ── State viewboxes ───────────────────────────────────────────

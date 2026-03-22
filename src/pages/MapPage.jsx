@@ -16,9 +16,24 @@ export default function MapPage() {
   function handleCountryClick(id) {
     const country = COUNTRIES.find(c => c.id === id)
     if (!country) return
+
+    // if clicking a different country while already zoomed in, switch to it
+    if (activeCountry && activeCountry.id !== id) {
+      setActiveState(null)
+    }
+
     setActiveCountry(country)
-    setActiveState(null)
-    setView('country')
+
+    const states = STATES[id] || []
+    const hasRealStates = states.length > 0 && states[0].id !== id
+
+    if (!hasRealStates) {
+      // no states — skip straight to city view
+      setView('cities')
+    } else {
+      setView('country')
+    }
+
     if (COUNTRY_VIEWBOXES[id]) setViewBox(COUNTRY_VIEWBOXES[id])
   }
 
@@ -36,26 +51,37 @@ export default function MapPage() {
       setView('country')
       setActiveState(null)
       setViewBox(COUNTRY_VIEWBOXES[activeCountry?.id] || '0 0 800 600')
-    } else if (view === 'country') {
+    } else if (view === 'country' || view === 'cities') {
       setView('world')
       setActiveCountry(null)
+      setActiveState(null)
       setViewBox('0 0 800 600')
     }
   }
 
-  // cities visible at this zoom level
-  const visibleSizes = CITY_VISIBILITY[view] || []
+  // which city sizes are visible at this zoom level
+  const visibleSizes = view === 'state'
+    ? ['major', 'medium', 'minor']
+    : view === 'cities'
+      ? ['major', 'medium', 'minor']
+      : view === 'country'
+        ? ['major', 'medium']
+        : ['major']
+
   function getVisibleCities() {
     if (!activeCountry) return []
     const all = CITIES[activeCountry.id] || {}
+
     if (view === 'state' && activeState) {
       return (all[activeState.id] || []).filter(c => visibleSizes.includes(c.size))
     }
+
+    // for 'cities' view (no states) or 'country' view — show all cities in country
     return Object.values(all).flat().filter(c => visibleSizes.includes(c.size))
   }
+
   const visibleCities = getVisibleCities()
 
-  // scale dot size relative to current viewBox zoom
   function dotSize(size) {
     const w = parseFloat(viewBox.split(' ')[2])
     const scale = w / 800
@@ -63,7 +89,14 @@ export default function MapPage() {
     return (base[size] || 3) * scale
   }
 
-  const tooltip = hoveredCity || (hoveredId ? { label: COUNTRIES.find(c => c.id === hoveredId)?.label || (STATES[activeCountry?.id] || []).find(s => s.id === hoveredId)?.label || hoveredId } : null)
+  const tooltip = hoveredCity || (hoveredId
+    ? {
+        label:
+          COUNTRIES.find(c => c.id === hoveredId)?.label ||
+          (STATES[activeCountry?.id] || []).find(s => s.id === hoveredId)?.label ||
+          hoveredId
+      }
+    : null)
 
   return (
     <div className="page-inner" style={{ maxWidth: 1100 }}>
@@ -73,16 +106,18 @@ export default function MapPage() {
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', margin: 0 }}>
           {view === 'world' && 'Dripstan'}
           {view === 'country' && activeCountry?.label}
+          {view === 'cities' && activeCountry?.label}
           {view === 'state' && activeState?.label}
         </h1>
         <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          {view === 'world' && 'Continente — clica num país'}
-          {view === 'country' && 'País — clica num estado'}
-          {view === 'state' && 'Estado — clica numa cidade'}
+          {view === 'world' && 'Continent — click a country'}
+          {view === 'country' && 'Country — click a state'}
+          {view === 'cities' && 'Country — click a city'}
+          {view === 'state' && 'State — click a city'}
         </div>
         {view !== 'world' && (
           <button onClick={goBack} className="filter-btn" style={{ marginLeft: 'auto' }}>
-            ← Voltar
+            ← Back
           </button>
         )}
       </div>
@@ -99,8 +134,17 @@ export default function MapPage() {
           <>
             <span className="sep">/</span>
             <span
-              style={{ cursor: view === 'state' ? 'pointer' : 'default', color: view === 'state' ? 'var(--link)' : undefined }}
-              onClick={() => { if (view === 'state') { setView('country'); setActiveState(null); setViewBox(COUNTRY_VIEWBOXES[activeCountry.id] || '0 0 800 600') } }}
+              style={{
+                cursor: view === 'state' ? 'pointer' : 'default',
+                color: view === 'state' ? 'var(--link)' : undefined
+              }}
+              onClick={() => {
+                if (view === 'state') {
+                  setView('country')
+                  setActiveState(null)
+                  setViewBox(COUNTRY_VIEWBOXES[activeCountry.id] || '0 0 800 600')
+                }
+              }}
             >
               {activeCountry.label}
             </span>
@@ -123,26 +167,30 @@ export default function MapPage() {
             viewBox={viewBox}
             style={{ width: '100%', display: 'block', transition: 'viewBox 0.4s ease' }}
           >
-            {/* Country paths — world view */}
+            {/* Country paths — always rendered so you can click neighbors */}
             {COUNTRIES.map(c => (
               <path
                 key={c.id}
                 id={c.id}
                 d={c.path}
-                fill={hoveredId === c.id ? 'var(--text-accent)' : 'var(--bg-surface)'}
+                fill={
+                  activeCountry?.id === c.id
+                    ? 'color-mix(in srgb, var(--text-accent) 25%, var(--bg-surface))'
+                    : hoveredId === c.id
+                      ? 'color-mix(in srgb, var(--text-accent) 40%, var(--bg-surface))'
+                      : 'var(--bg-surface)'
+                }
                 stroke="var(--border-strong)"
                 strokeWidth="1"
                 style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
                 onMouseEnter={() => setHoveredId(c.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                onClick={() => {
-                  if (view === 'world') handleCountryClick(c.id)
-                }}
+                onClick={() => handleCountryClick(c.id)}
               />
             ))}
 
-            {/* State paths — country/state view */}
-            {(view === 'country' || view === 'state') && activeCountry && (STATES[activeCountry.id] || []).map(s => (
+            {/* State paths — only when inside a country with states */}
+            {view === 'country' && activeCountry && (STATES[activeCountry.id] || []).map(s => (
               <path
                 key={s.id}
                 id={s.id}
@@ -152,7 +200,7 @@ export default function MapPage() {
                     ? 'var(--text-accent)'
                     : hoveredId === s.id
                       ? 'color-mix(in srgb, var(--text-accent) 40%, var(--bg-surface))'
-                      : 'var(--bg-surface)'
+                      : 'transparent'
                 }
                 stroke="var(--border-strong)"
                 strokeWidth="0.5"
@@ -171,7 +219,7 @@ export default function MapPage() {
                 <g
                   key={city.id}
                   style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => setHoveredCity(city)}
+                  onMouseEnter={() => { setHoveredCity(city); setHoveredId(null) }}
                   onMouseLeave={() => setHoveredCity(null)}
                   onClick={() => navigate(`/article/${pathToSlug(city.article)}`)}
                 >
@@ -189,7 +237,7 @@ export default function MapPage() {
                       stroke="var(--bg-surface)" strokeWidth={r * 0.4}
                     />
                   )}
-                  {(view === 'state' || city.size === 'major') && (
+                  {(view === 'state' || view === 'cities' || city.size === 'major') && (
                     <text
                       x={city.cx + r + 2} y={city.cy + r * 0.4}
                       fontSize={dotSize('major') * 1.8}
@@ -222,19 +270,25 @@ export default function MapPage() {
             }}>
               <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
               {tooltip.pop && <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginTop: 2 }}>Pop: {tooltip.pop}</div>}
-              {tooltip.article && <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginTop: 2 }}>Clica para abrir</div>}
+              {tooltip.article && <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginTop: 2 }}>Click to open article</div>}
             </div>
           )}
 
           {/* Legend */}
-          <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '6px 10px', fontFamily: 'var(--font-ui)', fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{
+            position: 'absolute', bottom: 10, left: 10,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            padding: '6px 10px', fontFamily: 'var(--font-ui)',
+            fontSize: '0.65rem', color: 'var(--text-muted)',
+            display: 'flex', flexDirection: 'column', gap: 4
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="10" height="10"><rect x="1" y="1" width="8" height="8" fill="var(--text-primary)" /></svg>
               Capital
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="var(--text-primary)" /></svg>
-              Cidade
+              City
             </div>
           </div>
         </div>
@@ -258,7 +312,7 @@ function InfoPanel({ view, country, state, states, cities, onStateClick }) {
 
   if (view === 'world') return (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem' }}>
-      <SectionLabel>Nações</SectionLabel>
+      <SectionLabel>Nations</SectionLabel>
       {COUNTRIES.map(c => (
         <PanelRow key={c.id}>
           <Link to={`/article/${pathToSlug(c.article)}`}>{c.label}</Link>
@@ -267,18 +321,36 @@ function InfoPanel({ view, country, state, states, cities, onStateClick }) {
     </div>
   )
 
-  if (view === 'country' && country) return (
+  if ((view === 'country' || view === 'cities') && country) return (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem' }}>
       <PanelTitle title={country.label} article={country.article} />
-      <SectionLabel>Estados</SectionLabel>
-      {(states || []).map(s => (
-        <PanelRow key={s.id} onClick={() => onStateClick(s.id)} clickable>
-          <div style={{ fontWeight: 600 }}>{s.label}</div>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            {s.capital}{s.pop ? ` · Pop. ${s.pop}` : ''}
-          </div>
-        </PanelRow>
-      ))}
+      {view === 'country' && (
+        <>
+          <SectionLabel>States</SectionLabel>
+          {(states || []).map(s => (
+            <PanelRow key={s.id} onClick={() => onStateClick(s.id)} clickable>
+              <div style={{ fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                {s.capital}{s.pop ? ` · Pop. ${s.pop}` : ''}
+              </div>
+            </PanelRow>
+          ))}
+        </>
+      )}
+      {view === 'cities' && cities.length > 0 && (
+        <>
+          <SectionLabel>Cities</SectionLabel>
+          {cities.map(c => (
+            <PanelRow key={c.id} clickable onClick={() => navigate(`/article/${pathToSlug(c.article)}`)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {c.capital && <span style={{ fontSize: '0.6rem', color: 'var(--text-accent)' }}>■</span>}
+                <span style={{ fontWeight: c.capital ? 700 : 400 }}>{c.label}</span>
+              </div>
+              {c.pop && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Pop. {c.pop}</div>}
+            </PanelRow>
+          ))}
+        </>
+      )}
     </div>
   )
 
@@ -286,11 +358,11 @@ function InfoPanel({ view, country, state, states, cities, onStateClick }) {
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem' }}>
       <PanelTitle title={state.label} article={state.article} />
       <InfoRow label="Capital"    value={state.capital} />
-      <InfoRow label="População"  value={state.pop} />
-      <InfoRow label="PIB/capita" value={state.gdp ? `D$${state.gdp}` : null} />
+      <InfoRow label="Population" value={state.pop} />
+      <InfoRow label="GDP/capita" value={state.gdp ? `D$${state.gdp}` : null} />
       {cities.length > 0 && (
         <>
-          <SectionLabel>Cidades</SectionLabel>
+          <SectionLabel>Cities</SectionLabel>
           {cities.map(c => (
             <PanelRow key={c.id} clickable onClick={() => navigate(`/article/${pathToSlug(c.article)}`)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -312,7 +384,7 @@ function PanelTitle({ title, article }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>{title}</div>
-      <Link to={`/article/${pathToSlug(article)}`} style={{ fontSize: '0.72rem', color: 'var(--link)' }}>Abrir artigo →</Link>
+      <Link to={`/article/${pathToSlug(article)}`} style={{ fontSize: '0.72rem', color: 'var(--link)' }}>Open article →</Link>
     </div>
   )
 }
