@@ -85,7 +85,7 @@ export default function MapPage() {
   function dotSize(size) {
     const w = parseFloat(viewBox.split(' ')[2])
     const scale = w / 800
-    const base = { major: 5, medium: 3.5, minor: 2.5 }
+    const base = { major: 10, medium: 8, minor: 6 }
     return (base[size] || 3) * scale
   }
 
@@ -239,10 +239,14 @@ export default function MapPage() {
                   )}
                   {(view === 'state' || view === 'cities' || city.size === 'major') && (
                     <text
-                      x={city.cx + r + 2} y={city.cy + r * 0.4}
-                      fontSize={dotSize('major') * 1.8}
+                      x={city.cx + r + 1} y={city.cy + r * 0.5}
+                      fontSize={dotSize('major') * 1.6}
                       fill="var(--text-primary)"
                       fontFamily="var(--font-ui)"
+                      paintOrder="stroke"
+                      stroke="var(--bg-surface)"
+                      strokeWidth={dotSize('major') * 0.8}
+                      strokeLinejoin="round"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >
                       {city.label}
