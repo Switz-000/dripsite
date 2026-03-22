@@ -140,7 +140,7 @@ export const COUNTRY_VIEWBOXES = {
   pierej:       '478 166 228 175',
   kamino:       '492 271 254 217',
   astofayan:    '50 367 158 136',
-  ditania:      '288 422 106 82',
+  ditania:      '294 426 98 78',
   cabunire:     '355 420 103 110',
   drippalia:    '238 64 178 85',
   celiolaj:     '221 0 180 105',
