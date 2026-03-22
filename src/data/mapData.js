@@ -133,9 +133,9 @@ export const COUNTRIES = [
 // Vais preencher estes depois de ver o mapa no browser
 // São as coordenadas do viewBox quando se clica num país
 export const COUNTRY_VIEWBOXES = {
-  susia:   '0 0 800 600', // ← vais ajustar depois
-  confia:  '0 0 800 600',
-  zaphonia:'0 0 800 600',
+  susia: '71.8 66.8 211.6 379.7', // ← vais ajustar depois
+  confia:  '260 119.5 266.5 204.9',
+  zaphonia:'256.7 289.8 285.5 185.',
 }
 
 // ── States ────────────────────────────────────────────────────
