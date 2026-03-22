@@ -6,6 +6,7 @@ import ArticlePage from './pages/ArticlePage'
 import BrowsePage from './pages/BrowsePage'
 import SearchPage from './pages/SearchPage'
 import NotFoundPage from './pages/NotFoundPage'
+import MapPage from './pages/MapPage'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="browse" element={<BrowsePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="*" element={<NotFoundPage />} />
+        <Route path="map" element={<MapPage />} />
       </Route>
     </Routes>
   )

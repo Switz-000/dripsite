@@ -54,6 +54,7 @@ export default function Layout() {
             <NavLink to="/browse" className={({ isActive }) => isActive ? 'active' : ''}>Browse All</NavLink>
             <NavLink to="/search" className={({ isActive }) => isActive ? 'active' : ''}>Search</NavLink>
           </div>
+          <NavLink to="/map" className={({ isActive }) => isActive ? 'active' : ''}>Map</NavLink>
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-label">By Type</div>
             <Link to="/browse?type=person">People</Link>
