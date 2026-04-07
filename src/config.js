@@ -10,16 +10,16 @@ export const SITE = {
   tagline:     'The Free Encyclopedia',
   description: 'A comprehensive reference for the nations, people, and history of the Dripstan continent.',
   // Shown in the masthead bar at the top of every page
-  masthead:    'Dripwiki — Encyclopedia of the Dripstan Continent',
+  masthead:    'Freely provided by Troli Ustaras, in the spirit of open knowledge',
   // Shown at the bottom of the sidebar
-  footer:      'Sourced from github.com/Switz-000/dripwiki',
+  footer:      'Content on this encyclopedia is freely available under the YM TU-(C4) license.',
 }
 
 // ── Home page hero text ──────────────────────────────────────
 export const HOME = {
   overline:  'Provided by Troli Ustaras',
-  // Use *word* to make it italic+red in the title
-  title:     'The *Dripstão* Encyclopedia',
+  // Use *word* to make it italic+blue in the title
+  title:     'The *Dripstan* Encyclopedia',
   subtitle:  'A comprehensive reference for the Techno-Federative Republic of Susia, its history, institutions, corporations, and people.',
 }
 
@@ -46,7 +46,7 @@ export const FEATURED_ARTICLES = [
     desc:  'A susian corporation granted strategic status',
   },
   {
-    slug:  '01 - Susia/01 - Goverment/Municipal/Free Economic Zone ',
+    slug:  '01 - Susia__01 - Goverment__Municipal__Free Economic Zone ',
     label: 'Free Economic Zone',
     desc:  'A city-scale territory governed by a Yarnojte',
   },

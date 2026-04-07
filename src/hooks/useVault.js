@@ -14,7 +14,7 @@ import {
 } from '../utils/markdown'
 
 // Module-level caches — survive re-renders and re-mounts
-const articleCache = new Map()
+export const articleCache = new Map()
 let treeCache = null
 let treePending = null   // in-flight promise, deduplicated
 

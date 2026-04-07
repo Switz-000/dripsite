@@ -1,6 +1,6 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 
-// Fields to display per article type, in order
 const FIELD_CONFIGS = {
   person: [
     ['birth_year', 'Born'],
@@ -57,69 +57,115 @@ const FIELD_CONFIGS = {
 }
 
 const DEFAULT_FIELDS = [
-  ['type', 'Type'],
   ['era', 'Era'],
   ['founded', 'Founded'],
   ['capital', 'Capital'],
 ]
 
-function formatValue(key, val) {
+// Fields never shown in infobox (used elsewhere in the UI)
+const SKIP_FIELDS = new Set([
+  'type', 'summary',
+  'full_name', 'company_name', 'state_name', 'event_name', 'official_name', 'name',
+])
+
+function humanizeKey(key) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function formatNumber(key, val) {
+  if (key.includes('market_cap')) return 'D$' + (val / 1e9).toFixed(1) + 'B'
+  if (key.includes('population')) return val.toLocaleString()
+  if (key.includes('gdp')) return 'D$' + val.toLocaleString()
+  return val.toLocaleString()
+}
+
+function renderInlineText(text, wikilinkFn) {
+  const re = /\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g
+  const parts = []
+  let last = 0
+  let m
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    const target = m[1]
+    const display = m[2] || m[1]
+    const slug = wikilinkFn ? wikilinkFn(target) : null
+    parts.push(
+      slug
+        ? <Link key={m.index} to={`/article/${slug}`} className="infobox-link">{display}</Link>
+        : display
+    )
+    last = re.lastIndex
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  if (parts.length === 0) return null
+  if (parts.length === 1) return parts[0]
+  return parts
+}
+
+function renderValue(key, val, wikilinkFn) {
   if (val === null || val === undefined) return null
   if (typeof val === 'boolean') return val ? 'Yes' : 'No'
+  if (typeof val === 'number') return formatNumber(key, val)
   if (Array.isArray(val)) {
-    const items = val.filter(Boolean)
+    const items = val.filter(v => v !== null && v !== undefined)
     if (!items.length) return null
-    return items
-      .map(v => {
-        // Strip [[wikilink]] syntax
-        if (typeof v === 'string') return v.replace(/\[\[([^\]|]+)\|?([^\]]*)\]\]/g, (_, p, a) => a || p)
-        return String(v)
-      })
-      .join(', ')
+    return items.map((v, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && ', '}
+        {renderInlineText(String(v), wikilinkFn)}
+      </React.Fragment>
+    ))
   }
   if (typeof val === 'string') {
-    return val.replace(/\[\[([^\]|]+)\|?([^\]]*)\]\]/g, (_, p, a) => a || p)
-  }
-  if (typeof val === 'number') {
-    if (key.includes('market_cap')) {
-      return 'D$' + (val / 1e9).toFixed(1) + 'B'
-    }
-    if (key.includes('population')) {
-      return val.toLocaleString()
-    }
-    if (key.includes('gdp')) {
-      return 'D$' + val.toLocaleString()
-    }
-    return val.toLocaleString()
+    if (!val.trim()) return null
+    return renderInlineText(val, wikilinkFn)
   }
   return String(val)
 }
 
-export default function Infobox({ meta, title }) {
+export default function Infobox({ meta, title, imageUrl, wikilinkFn }) {
   if (!meta || Object.keys(meta).length === 0) return null
 
   const type = meta.type
-  const fields = FIELD_CONFIGS[type] || DEFAULT_FIELDS
+  const typedConfig = FIELD_CONFIGS[type] || DEFAULT_FIELDS
+  const typedKeys = new Set(typedConfig.map(([k]) => k))
 
-  const rows = fields
-    .map(([key, label]) => {
-      const val = formatValue(key, meta[key])
-      if (!val) return null
-      return { label, val }
-    })
-    .filter(Boolean)
+  // Type-specific fields first (in configured order)
+  const rows = []
+  for (const [key, label] of typedConfig) {
+    const val = renderValue(key, meta[key], wikilinkFn)
+    if (val === null || val === undefined) continue
+    rows.push({ label, val })
+  }
 
-  if (!rows.length) return null
+  // Remaining meta fields not already shown
+  for (const [key, rawVal] of Object.entries(meta)) {
+    if (SKIP_FIELDS.has(key)) continue
+    if (typedKeys.has(key)) continue
+    if (rawVal === null || rawVal === undefined) continue
+    const val = renderValue(key, rawVal, wikilinkFn)
+    if (val === null || val === undefined) continue
+    rows.push({ label: humanizeKey(key), val })
+  }
+
+  if (!rows.length && !imageUrl) return null
 
   return (
     <div className="infobox">
       <div className="infobox-title">{title}</div>
-      {rows.map(({ label, val }) => (
-        <div className="infobox-row" key={label}>
-          <span className="infobox-key">{label}</span>
-          <span className="infobox-val">{val}</span>
+      {imageUrl && (
+        <div className="infobox-image-wrap">
+          <img src={imageUrl} alt={title} />
         </div>
-      ))}
+      )}
+      <div className="infobox-fields">
+        {rows.map(({ label, val }) => (
+          <div className="infobox-row" key={label}>
+            <span className="infobox-key">{label}</span>
+            <span className="infobox-val">{val}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
