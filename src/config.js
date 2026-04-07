@@ -99,15 +99,23 @@ export const HOME_CATEGORIES = [
 //   text-accent:  '#c8a84b'
 //
 export const THEME = {
-  'bg':           '#101418',
-  'bg-surface':   '#202122',
-  'bg-elevated':  null,
-  'text-primary': '#dbd8d0',
-  'text-secondary': '#777373',
-  'text-muted':   null,
-  'text-accent':  '#4980e7',
-  'link':         '#8fb1e5',
-  'link-hover':   '#5480e9',
-  'border':       null,
-  'rule':         null,
+  // Backgrounds — warm near-black replaced with cool blue-tinted darks
+  'bg':           '#0d1117',   // deep navy-black (was warm #101418)
+  'bg-surface':   '#161c24',   // cool dark navy (was warm grey #202122)
+  'bg-elevated':  '#1e2a38',   // muted slate-navy (was neutral #313233)
+
+  // Text — warm parchment cooled slightly, still readable and professional
+  'text-primary':   '#d6d9de', // cool off-white (was warm #dbd8d0)
+  'text-secondary': '#6b7685', // cool blue-grey (was warm brown-grey #777373)
+  'text-muted':     '#4e5a68', // deeper cool slate (was warm #8a837a)
+
+  // Accents — shifted slightly more cobalt/electric, less pure blue
+  'text-accent':  '#4a8ff5',   // vivid cobalt (was #4980e7, subtly brighter)
+  'link':         '#7aaee8',   // desaturated sky-blue (was warm #8fb1e5)
+  'link-hover':   '#4a8ff5',   // matches accent for cohesion
+  'link-visited': '#9b8ec4',
+
+  // Borders — cooled down considerably
+  'border':       '#2a3441',   // cool dark steel
+  'rule':         '#141b24',   // deep navy rule (was warm #1a1814)
 }

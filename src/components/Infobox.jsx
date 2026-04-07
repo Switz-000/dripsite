@@ -102,6 +102,25 @@ function renderInlineText(text, wikilinkFn) {
   return parts
 }
 
+function renderObjectList(items, wikilinkFn) {
+  return (
+    <div className="infobox-obj-list">
+      {items.map((obj, i) => (
+        <div key={i} className="infobox-obj-item">
+          {Object.entries(obj)
+            .filter(([, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => (
+              <div key={k} className="infobox-obj-row">
+                <span className="infobox-obj-key">{humanizeKey(k)}</span>
+                <span className="infobox-obj-val">{renderValue(k, v, wikilinkFn)}</span>
+              </div>
+            ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function renderValue(key, val, wikilinkFn) {
   if (val === null || val === undefined) return null
   if (typeof val === 'boolean') return val ? 'Yes' : 'No'
@@ -109,6 +128,9 @@ function renderValue(key, val, wikilinkFn) {
   if (Array.isArray(val)) {
     const items = val.filter(v => v !== null && v !== undefined)
     if (!items.length) return null
+    if (items.some(v => typeof v === 'object' && v !== null)) {
+      return renderObjectList(items, wikilinkFn)
+    }
     return items.map((v, i) => (
       <React.Fragment key={i}>
         {i > 0 && ', '}
@@ -162,7 +184,7 @@ export default function Infobox({ meta, title, imageUrl, wikilinkFn }) {
         {rows.map(({ label, val }) => (
           <div className="infobox-row" key={label}>
             <span className="infobox-key">{label}</span>
-            <span className="infobox-val">{val}</span>
+            <div className="infobox-val">{val}</div>
           </div>
         ))}
       </div>

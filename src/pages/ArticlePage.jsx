@@ -143,6 +143,7 @@ export default function ArticlePage() {
       visible={popup.visible}
       onMouseEnter={cancelHide}
       onMouseLeave={scheduleHide}
+      onClose={() => setPopup(p => ({ ...p, visible: false }))}
     />
   </>
   )

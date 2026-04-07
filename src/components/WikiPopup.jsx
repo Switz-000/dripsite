@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import { getTypeLabel } from '../utils/markdown'
 
-export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onMouseLeave }) {
-  if (!visible || !data) return null
+export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onMouseLeave, onClose }) {
+  if (!data) return null
 
   const W = 284
   const H = 160
-  let left = x + 16
-  let top  = y - 10
+  let left = x + 20
+  let top  = y
 
   if (left + W > window.innerWidth - 8)  left = x - 16 - W
   if (top  + H > window.innerHeight - 8) top  = window.innerHeight - H - 8
@@ -22,11 +22,12 @@ export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onM
   return (
     <Link
       to={`/article/${slug}`}
-      className="wiki-popup"
+      className={`wiki-popup${visible ? ' is-visible' : ''}`}
       style={{ left, top }}
       role="tooltip"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onClick={onClose}
     >
       {data.imageUrl && (
         <img className="wiki-popup-image" src={data.imageUrl} alt="" loading="lazy" />

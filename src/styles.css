@@ -214,12 +214,18 @@ a:visited { color: var(--link-visited); }
 .infobox-title { background: var(--bg-elevated); padding: 8px 12px; font-size: 0.78rem; font-weight: 700; text-align: center; color: var(--text-primary); border-bottom: 1px solid var(--border-strong); font-family: var(--font-display); font-style: italic; }
 .infobox-image-wrap { border-bottom: 1px solid var(--border); }
 .infobox-image-wrap img { display: block; width: 100%; max-height: 220px; object-fit: cover; object-position: center top; }
-.infobox-row { display: flex; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); line-height: 1.45; align-items: baseline; }
+.infobox-row { display: flex; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); line-height: 1.45; align-items: flex-start; }
 .infobox-row:last-child { border-bottom: none; }
 .infobox-key { color: var(--text-muted); min-width: 80px; flex-shrink: 0; font-size: 0.68rem; }
 .infobox-val { color: var(--text-secondary); word-break: break-word; }
 .infobox-link { color: var(--link); text-decoration: none; }
 .infobox-link:hover { color: var(--link-hover); text-decoration: underline; }
+.infobox-obj-list { display: flex; flex-direction: column; width: 100%; }
+.infobox-obj-item { padding: 4px 0; border-top: 1px dotted var(--border); }
+.infobox-obj-item:first-child { border-top: none; padding-top: 0; }
+.infobox-obj-row { display: flex; gap: 4px; line-height: 1.4; }
+.infobox-obj-key { color: var(--text-muted); font-size: 0.65rem; min-width: 52px; flex-shrink: 0; }
+.infobox-obj-val { color: var(--text-secondary); font-size: 0.75rem; }
 @media (max-width: 600px) { .infobox { float: none; width: 100%; margin: 0 0 20px 0; } }
 
 /* ── Home ── */
@@ -373,7 +379,7 @@ a:visited { color: var(--link-visited); }
 /* ── Wiki preview popup ── */
 .wiki-popup {
   position: fixed;
-  z-index: 500;
+  z-index: 700;
   width: 280px;
   background: var(--bg-surface);
   border: 1px solid var(--border-strong);
@@ -383,6 +389,13 @@ a:visited { color: var(--link-visited); }
   text-decoration: none;
   display: block;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.wiki-popup.is-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .wiki-popup-image {

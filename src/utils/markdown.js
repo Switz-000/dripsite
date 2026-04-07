@@ -2,6 +2,15 @@ import { marked } from 'marked'
 import { isImageFilename, imageUrl } from './github'
 
 // ── Frontmatter parser ──────────────────────────────────────
+function parseScalar(raw) {
+  const val = raw.trim().replace(/^["']|["']$/g, '')
+  if (val === '') return null
+  if (val === 'true') return true
+  if (val === 'false') return false
+  if (!isNaN(val) && val !== '') return Number(val)
+  return val
+}
+
 export function parseFrontmatter(raw) {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)/)
   if (!match) return { meta: {}, body: raw }
@@ -10,29 +19,53 @@ export function parseFrontmatter(raw) {
   const body = match[2]
   const meta = {}
   let currentKey = null
+  let currentObject = null  // current object item being built in an array
 
   for (const line of yamlBlock.split('\n')) {
     if (!line.trim()) continue
 
-    if (line.match(/^\s+-\s+/)) {
-      const val = line.replace(/^\s+-\s+/, '').trim().replace(/^["']|["']$/g, '')
-      if (currentKey) {
+    // Sub-key of an object array item (indented, no dash, inside a current object)
+    if (currentObject && !line.match(/^\s*-/) && line.match(/^\s+(\w[\w_-]*):\s*(.*)$/)) {
+      const m = line.match(/^\s+(\w[\w_-]*):\s*(.*)$/)
+      currentObject[m[1]] = parseScalar(m[2])
+      continue
+    }
+
+    // List item
+    if (line.match(/^\s+-\s*/)) {
+      const content = line.replace(/^\s+-\s*/, '')
+      const objMatch = content.match(/^(\w[\w_-]*):\s*(.*)$/)
+
+      if (objMatch) {
+        // Object item (e.g. "- degree: BSc") — finalize previous object and start new one
+        if (currentObject) meta[currentKey].push(currentObject)
         if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
-        meta[currentKey].push(val)
+        currentObject = { [objMatch[1]]: parseScalar(objMatch[2]) }
+      } else {
+        // Simple string item — finalize any current object
+        if (currentObject) { meta[currentKey].push(currentObject); currentObject = null }
+        const val = content.trim().replace(/^["']|["']$/g, '')
+        if (currentKey) {
+          if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
+          meta[currentKey].push(val)
+        }
       }
       continue
     }
 
+    // Top-level key — finalize any current object
     const kv = line.match(/^(\w[\w_-]*):\s*(.*)$/)
     if (kv) {
+      if (currentObject) { meta[currentKey].push(currentObject); currentObject = null }
       currentKey = kv[1]
-      const val = kv[2].trim().replace(/^["']|["']$/g, '')
-      if (val === '') meta[currentKey] = null
-      else if (val === 'true') meta[currentKey] = true
-      else if (val === 'false') meta[currentKey] = false
-      else if (!isNaN(val) && val !== '') meta[currentKey] = Number(val)
-      else meta[currentKey] = val
+      meta[currentKey] = parseScalar(kv[2])
     }
+  }
+
+  // Finalize any trailing object item
+  if (currentObject && currentKey) {
+    if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
+    meta[currentKey].push(currentObject)
   }
 
   return { meta, body: body.trim() }
