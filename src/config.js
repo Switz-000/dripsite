@@ -17,9 +17,9 @@ export const SITE = {
 
 // ── Home page hero text ──────────────────────────────────────
 export const HOME = {
-  overline:  'Classified Archive — Public Access Tier',
+  overline:  'Provided by Troli Ustaras',
   // Use *word* to make it italic+red in the title
-  title:     'The *Dripwiki* Encyclopedia',
+  title:     'The *Dripstão* Encyclopedia',
   subtitle:  'A comprehensive reference for the Techno-Federative Republic of Susia, its history, institutions, corporations, and people.',
 }
 
@@ -42,18 +42,18 @@ export const FEATURED_ARTICLES = [
   },
   {
     slug:  '01 - Susia__01 - Goverment__Federal__Yarnojte',
-    label: 'Yarnojtes',
-    desc:  'Strategic monopoly corporations',
+    label: 'Yarnojte',
+    desc:  'A susian corporation granted strategic status',
+  },
+  {
+    slug:  '01 - Susia/01 - Goverment/Municipal/Free Economic Zone ',
+    label: 'Free Economic Zone',
+    desc:  'A city-scale territory governed by a Yarnojte',
   },
   {
     slug:  '01 - Susia__04 - History__Continental Divide',
     label: 'Continental Divide',
     desc:  'The cold war with Confia, 1957-1977',
-  },
-  {
-    slug:  '01 - Susia__05 - Culture__Susian Exceptionalism',
-    label: 'Susian Exceptionalism',
-    desc:  'National identity and civilizational myth',
   },
   {
     slug:  '01 - Susia__06 - Characters__Armadesh Versij',
@@ -103,7 +103,7 @@ export const THEME = {
   'bg-surface':   '#202122',
   'bg-elevated':  null,
   'text-primary': '#dbd8d0',
-  'text-secondary': '#bebebe',
+  'text-secondary': '#777373',
   'text-muted':   null,
   'text-accent':  '#4980e7',
   'link':         '#8fb1e5',
