@@ -20,7 +20,7 @@ export const HOME = {
   overline:  'Provided by Troli Ustaras',
   // Use *word* to make it italic+blue in the title
   title:     'The *Dripstan* Encyclopedia',
-  subtitle:  'A comprehensive reference for the Techno-Federative Republic of Susia, its history, institutions, corporations, and people.',
+  subtitle:  'A comprehensive reference for the Dripstan continenent, its history, institutions, corporations, and people.',
 }
 
 // ── Stats shown on home page ─────────────────────────────────

@@ -366,6 +366,87 @@ a:visited { color: var(--link-visited); }
   text-align: center;
 }
 
+/* ── Sub-filter panel ── */
+.subfilter-panel {
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--text-accent);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subfilter-loading {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.subfilter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subfilter-group-label {
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-left: 2px;
+  border-left: 2px solid var(--border);
+  padding-left: 6px;
+  margin-bottom: 2px;
+}
+
+.subfilter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.subfilter-label {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.subfilter-options {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.subfilter-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.subfilter-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+.subfilter-btn.active { background: var(--text-accent); border-color: var(--text-accent); color: var(--bg-page); }
+
+/* count badge on type filter buttons */
+.filter-btn-count {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 0.6rem;
+  opacity: 0.6;
+  letter-spacing: 0;
+}
+
 /* ── Search page additions ── */
 .search-no-results,
 .search-hint {

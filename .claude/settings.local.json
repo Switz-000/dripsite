@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s \"https://api.github.com/repos/Switz-000/dripwiki/contents/01%20-%20Susia/06%20-%20People\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/Switz-000/dripwiki/main/01%20-%20Susia/06%20-%20People/Armadesh%20Versij.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/Switz-000/dripwiki/main/01%20-%20Susia/06%20-%20People/Chedji%20Soites.md\")"
+    ]
+  }
+}

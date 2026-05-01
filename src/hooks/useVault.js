@@ -12,9 +12,11 @@ import {
   getTitle,
   extractSummary,
 } from '../utils/markdown'
+import { fetchClassSchemas } from '../utils/classSchema'
 
 // Module-level caches — survive re-renders and re-mounts
 export const articleCache = new Map()
+export const metaCache = new Map()   // path -> frontmatter meta (lightweight)
 let treeCache = null
 let treePending = null   // in-flight promise, deduplicated
 
@@ -128,6 +130,39 @@ export function useSearchIndex() {
   }, [tree])
 
   return index
+}
+
+// ── Class schemas ─────────────────────────────────────────────
+export function useClassSchemas() {
+  const [schemas, setSchemas] = useState(null)
+
+  useEffect(() => {
+    fetchClassSchemas()
+      .then(setSchemas)
+      .catch(() => setSchemas({}))
+  }, [])
+
+  return schemas  // null while loading, {} on error, { typeName: [...] } when ready
+}
+
+// ── Lightweight frontmatter fetch ─────────────────────────────
+// Fetches just the frontmatter for an article path. Checks metaCache first,
+// then articleCache (populated when full articles are visited), then fetches.
+export async function fetchMeta(path) {
+  if (metaCache.has(path)) return metaCache.get(path)
+
+  // Reuse already-fetched full articles
+  for (const article of articleCache.values()) {
+    if (article.path === path) {
+      metaCache.set(path, article.meta)
+      return article.meta
+    }
+  }
+
+  const raw = await fetchMarkdown(path)
+  const { meta } = parseFrontmatter(raw)
+  metaCache.set(path, meta)
+  return meta
 }
 
 export { pathToSlug, slugToPath }
