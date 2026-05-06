@@ -5,6 +5,7 @@ import { getTypeLabel } from '../utils/markdown'
 import { wikilinkToSlug } from '../utils/github'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
+import PersonInfobox from '../components/PersonInfobox'
 import { Loading, ErrorState } from '../components/Loading'
 import { fetchPreview } from '../utils/previews'
 import WikiPopup from '../components/WikiPopup'
@@ -34,7 +35,7 @@ export default function ArticlePage() {
     if (!el || !tree) return
 
     function onOver(e) {
-      const link = e.target.closest('a.wikilink')
+      const link = e.target.closest('a.wikilink, a.ibx-link')
       if (!link) return
       const linkSlug = link.getAttribute('href')?.replace('/article/', '')
       if (!linkSlug) return
@@ -50,7 +51,7 @@ export default function ArticlePage() {
     }
 
     function onOut(e) {
-      const link = e.target.closest('a.wikilink')
+      const link = e.target.closest('a.wikilink, a.ibx-link')
       if (!link) return
       if (link.contains(e.relatedTarget)) return
       clearTimeout(hoverTimerRef.current)
@@ -130,7 +131,10 @@ export default function ArticlePage() {
       </header>
 
       <div className="article-body" ref={bodyRef}>
-        <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
+        {article.meta.type === 'person'
+          ? <PersonInfobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
+          : <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
+        }
         <div dangerouslySetInnerHTML={{ __html: article.html }} />
       </div>
     </div>

@@ -10,7 +10,7 @@ import MapPage from './pages/MapPage'
 
 export default function App() {
   return (
-    <Routes>
+    <Routes>  
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         {/* Use * so base64 slugs with any char are captured cleanly */}

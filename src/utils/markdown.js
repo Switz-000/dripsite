@@ -2,73 +2,107 @@ import { marked } from 'marked'
 import { isImageFilename, imageUrl } from './github'
 
 // ── Frontmatter parser ──────────────────────────────────────
-function parseScalar(raw) {
-  const val = raw.trim().replace(/^["']|["']$/g, '')
-  if (val === '') return null
-  if (val === 'true') return true
-  if (val === 'false') return false
-  if (!isNaN(val) && val !== '') return Number(val)
-  return val
-}
-
+// Supports: nested mappings, sequences of objects/scalars,
+// yes/no/true/false booleans, quoted strings, null/~ values.
 export function parseFrontmatter(raw) {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)/)
   if (!match) return { meta: {}, body: raw }
+  return { meta: parseYAMLBlock(match[1]), body: match[2].trim() }
+}
 
-  const yamlBlock = match[1]
-  const body = match[2]
-  const meta = {}
-  let currentKey = null
-  let currentObject = null  // current object item being built in an array
+function parseYAMLBlock(src) {
+  const lines = src.split('\n').map(l => l.replace(/\t/g, '  '))
+  let idx = 0
 
-  for (const line of yamlBlock.split('\n')) {
-    if (!line.trim()) continue
+  const isBlank = l => l == null || /^\s*(#.*)?$/.test(l)
+  const indentOf = l => l == null ? -1 : l.match(/^( *)/)[1].length
 
-    // Sub-key of an object array item (indented, no dash, inside a current object)
-    if (currentObject && !line.match(/^\s*-/) && line.match(/^\s+(\w[\w_-]*):\s*(.*)$/)) {
-      const m = line.match(/^\s+(\w[\w_-]*):\s*(.*)$/)
-      currentObject[m[1]] = parseScalar(m[2])
-      continue
-    }
+  function skipBlanks() {
+    while (idx < lines.length && isBlank(lines[idx])) idx++
+  }
 
-    // List item
-    if (line.match(/^\s+-\s*/)) {
-      const content = line.replace(/^\s+-\s*/, '')
-      const objMatch = content.match(/^(\w[\w_-]*):\s*(.*)$/)
+  function scalar(s) {
+    const v = s.trim()
+    if (!v || v === '~' || /^null$/i.test(v)) return null
+    if ((v[0] === '"' && v[v.length - 1] === '"') ||
+        (v[0] === "'" && v[v.length - 1] === "'")) return v.slice(1, -1)
+    if (/^(true|yes|on)$/i.test(v)) return true
+    if (/^(false|no|off)$/i.test(v)) return false
+    if (/^-?\d+$/.test(v)) return +v
+    if (/^-?\d*\.\d+$/.test(v)) return +v
+    return v
+  }
 
-      if (objMatch) {
-        // Object item (e.g. "- degree: BSc") — finalize previous object and start new one
-        if (currentObject) meta[currentKey].push(currentObject)
-        if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
-        currentObject = { [objMatch[1]]: parseScalar(objMatch[2]) }
-      } else {
-        // Simple string item — finalize any current object
-        if (currentObject) { meta[currentKey].push(currentObject); currentObject = null }
-        const val = content.trim().replace(/^["']|["']$/g, '')
-        if (currentKey) {
-          if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
-          meta[currentKey].push(val)
-        }
+  function parseBlock(minIndent) {
+    skipBlanks()
+    if (idx >= lines.length) return null
+    const ind = indentOf(lines[idx])
+    if (ind < minIndent) return null
+    const rest = lines[idx].slice(ind)
+    if (rest === '-' || rest.startsWith('- ')) return parseSeq(ind)
+    return parseMap(ind)
+  }
+
+  function parseSeq(seqInd) {
+    const arr = []
+    while (idx < lines.length) {
+      if (isBlank(lines[idx])) { idx++; continue }
+      const l = lines[idx]
+      const ind = indentOf(l)
+      if (ind < seqInd) break
+      const rest = l.slice(ind)
+      if (!rest.startsWith('-')) break
+      const after = rest.slice(1).replace(/^ /, '')
+      idx++
+      if (!after.trim()) {
+        arr.push(parseBlock(seqInd + 2))
+        continue
       }
-      continue
+      const m = after.match(/^([\w][\w-]*)\s*:\s*(.*)$/)
+      if (m) {
+        const obj = {}
+        const [, k, v] = m
+        obj[k] = v.trim() ? scalar(v) : parseBlock(seqInd + 4)
+        // collect remaining sub-keys at this object's indent level
+        while (idx < lines.length) {
+          if (isBlank(lines[idx])) { idx++; continue }
+          const i2 = indentOf(lines[idx])
+          if (i2 <= seqInd) break
+          const r2 = lines[idx].slice(i2)
+          const mm = r2.match(/^([\w][\w-]*)\s*:\s*(.*)$/)
+          if (!mm) break
+          idx++
+          const [, k2, v2] = mm
+          obj[k2] = v2.trim() ? scalar(v2) : parseBlock(i2 + 2)
+        }
+        arr.push(obj)
+      } else {
+        arr.push(scalar(after))
+      }
     }
-
-    // Top-level key — finalize any current object
-    const kv = line.match(/^(\w[\w_-]*):\s*(.*)$/)
-    if (kv) {
-      if (currentObject) { meta[currentKey].push(currentObject); currentObject = null }
-      currentKey = kv[1]
-      meta[currentKey] = parseScalar(kv[2])
-    }
+    return arr
   }
 
-  // Finalize any trailing object item
-  if (currentObject && currentKey) {
-    if (!Array.isArray(meta[currentKey])) meta[currentKey] = []
-    meta[currentKey].push(currentObject)
+  function parseMap(mapInd) {
+    const obj = {}
+    while (idx < lines.length) {
+      if (isBlank(lines[idx])) { idx++; continue }
+      const l = lines[idx]
+      const ind = indentOf(l)
+      if (ind < mapInd) break
+      if (ind > mapInd) { idx++; continue }
+      const m = l.slice(ind).match(/^([\w][\w-]*)\s*:\s*(.*)$/)
+      if (!m) { idx++; continue }
+      const [, k, v] = m
+      idx++
+      obj[k] = v.trim() && v !== '|' && v !== '|-' && v !== '>' && v !== '>-'
+        ? scalar(v)
+        : parseBlock(mapInd + 2)
+    }
+    return obj
   }
 
-  return { meta, body: body.trim() }
+  return parseMap(0)
 }
 
 // ── Wikilink + image processing ─────────────────────────────
@@ -152,12 +186,14 @@ export function extractSummary(body, maxLen = 200) {
 }
 
 export function getTitle(meta, path) {
-  if (meta.company_name) return meta.company_name
-  if (meta.state_name)   return meta.state_name
-  if (meta.full_name)    return meta.full_name
-  if (meta.event_name)   return meta.event_name
-  if (meta.official_name) return meta.official_name
-  if (meta.name)         return meta.name
+  if (meta.company_name)    return meta.company_name
+  if (meta.state_name)      return meta.state_name
+  if (meta.full_name)       return meta.full_name
+  if (meta.event_name)      return meta.event_name
+  if (meta.official_name)   return meta.official_name
+  if (meta.lusitanized_name) return meta.lusitanized_name
+  if (meta.native_name)     return meta.native_name
+  if (meta.name)            return meta.name
   return path.split('/').pop().replace(/\.md$/, '')
 }
 

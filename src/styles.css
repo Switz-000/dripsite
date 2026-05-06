@@ -517,3 +517,445 @@ a:visited { color: var(--link-visited); }
 }
 
 .wiki-popup:hover .wiki-popup-title { color: var(--link); }
+
+/* ── Person Infobox ─────────────────────────────────────────────── */
+.ibx-person {
+  float: right;
+  clear: right;
+  margin: 0 0 20px 28px;
+  width: 300px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* Portrait */
+.ibx-portrait-head { position: relative; }
+
+.ibx-portrait-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 4.4;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.ibx-portrait-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 4.4;
+  background: repeating-linear-gradient(45deg, #2a2420 0 2px, #1a1410 2px 7px);
+  position: relative;
+  overflow: hidden;
+}
+.ibx-portrait-placeholder::before {
+  content: '';
+  position: absolute;
+  inset: 18% 22%;
+  background: radial-gradient(ellipse at 50% 38%, #3a2e26 0%, #241c16 45%, transparent 70%);
+  filter: blur(2px);
+}
+.ibx-portrait-placeholder::after {
+  content: 'Portrait · unavailable';
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(200, 185, 165, 0.45);
+  white-space: nowrap;
+}
+
+.ibx-title-block {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 16px 12px 12px;
+  background: linear-gradient(to bottom,
+    rgba(10, 8, 6, 0.93) 0%,
+    rgba(10, 8, 6, 0.65) 52%,
+    rgba(10, 8, 6, 0) 100%);
+  text-align: center;
+  pointer-events: none;
+}
+.ibx-kicker {
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(220, 205, 185, 0.68);
+  margin-bottom: 5px;
+}
+.ibx-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  color: #f0e8dc;
+  letter-spacing: -0.01em;
+}
+.ibx-dates {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: rgba(200, 185, 165, 0.7);
+}
+.ibx-date-rule {
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: rgba(200, 185, 165, 0.35);
+}
+
+/* Quick stats */
+.ibx-qstats {
+  display: grid;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.ibx-qstat {
+  padding: 8px 8px 9px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+.ibx-qstat:last-child { border-right: none; }
+.ibx-qstat-label {
+  font-family: var(--font-ui);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.ibx-qstat-value {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.ibx-qstat-unit {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-left: 3px;
+}
+.ibx-qstat-sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tabs */
+.ibx-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.ibx-tab-btn {
+  flex: 1;
+  padding: 7px 4px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+  transition: background var(--transition), color var(--transition);
+}
+.ibx-tab-btn:last-child { border-right: none; }
+.ibx-tab-btn:hover { background: var(--bg-rule); color: var(--text-primary); }
+.ibx-tab-btn[data-active="true"] {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  box-shadow: inset 0 -2px 0 var(--text-accent);
+}
+
+/* Panel body */
+.ibx-panel-body { min-height: 160px; }
+
+/* Section block inside panel */
+.ibx-section {
+  padding: 9px 12px 8px;
+  border-top: 1px solid var(--border);
+}
+.ibx-section:first-child { border-top: none; }
+.ibx-section-label {
+  font-family: var(--font-ui);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* Facts rows */
+.ibx-dl { margin: 0; }
+.ibx-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  padding: 5px 12px;
+  border-top: 1px solid var(--bg-rule);
+}
+.ibx-row:first-child { border-top: none; }
+.ibx-row-key {
+  font-family: var(--font-ui);
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  padding-top: 1px;
+  flex-shrink: 0;
+}
+.ibx-row-val {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  word-break: break-word;
+}
+.ibx-meta {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--text-muted);
+}
+.ibx-yes { color: var(--link); }
+.ibx-no  { color: var(--text-muted); font-style: italic; }
+.ibx-empty { color: var(--text-muted); }
+.ibx-link { color: var(--link); text-decoration: none; }
+.ibx-link:hover { color: var(--link-hover); text-decoration: underline; }
+.ibx-link-missing {
+  color: var(--link-missing);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--link-missing);
+  cursor: default;
+}
+
+/* Chips (occupation, political alignment) */
+.ibx-chip {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.67rem;
+  color: var(--text-secondary);
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  margin: 0 3px 3px 0;
+  background: transparent;
+  line-height: 1.6;
+}
+
+/* Office / military items */
+.ibx-office-item {
+  padding: 5px 0;
+  border-top: 1px dotted var(--border);
+  font-size: 0.75rem;
+}
+.ibx-office-item:first-child { border-top: none; }
+.ibx-office-title { color: var(--text-secondary); line-height: 1.35; }
+
+/* Education */
+.ibx-edu-item { font-size: 0.75rem; padding: 2px 0; color: var(--text-secondary); }
+
+/* List items (parties, orgs) */
+.ibx-list-item { font-size: 0.75rem; padding: 2px 0; color: var(--text-secondary); }
+
+/* Lifeline */
+.ibx-lifeline {
+  position: relative;
+  padding-left: 44px;
+}
+.ibx-lifeline::before {
+  content: '';
+  position: absolute;
+  left: 36px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--border);
+}
+.ibx-lf-item {
+  position: relative;
+  padding: 5px 0;
+  border-top: 1px dotted var(--bg-rule);
+}
+.ibx-lf-item:first-child { border-top: none; }
+.ibx-lf-year {
+  position: absolute;
+  left: -44px;
+  width: 32px;
+  top: 7px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+.ibx-lf-dot {
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+.ibx-lf-birth    .ibx-lf-dot { background: var(--border-strong); }
+.ibx-lf-death    .ibx-lf-dot { background: #b85a40; border-color: #b85a40; }
+.ibx-lf-office   .ibx-lf-dot { background: var(--link); border-color: var(--link); }
+.ibx-lf-military .ibx-lf-dot { background: var(--text-accent); border-color: var(--text-accent); }
+.ibx-lf-body  { padding-left: 4px; }
+.ibx-lf-title { font-size: 0.75rem; color: var(--text-primary); line-height: 1.3; }
+.ibx-lf-span  { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.02em; }
+.ibx-lf-meta  { font-size: 0.67rem; font-style: italic; color: var(--text-secondary); margin-top: 1px; }
+.ibx-lf-notes { font-size: 0.65rem; font-style: italic; color: var(--text-muted); margin-top: 2px; line-height: 1.35; }
+
+/* Known for grid */
+.ibx-kf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.ibx-kf-tile {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--text-primary);
+  transition: border-color var(--transition), background var(--transition);
+}
+.ibx-kf-tile:hover { border-color: var(--border-strong); background: var(--bg-rule); }
+.ibx-kf-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  display: block;
+}
+.ibx-kf-link:hover { color: var(--link); }
+
+/* Written works */
+.ibx-work-item {
+  padding: 5px 0;
+  border-top: 1px dotted var(--border);
+  font-size: 0.75rem;
+}
+.ibx-work-item:first-child { border-top: none; }
+.ibx-work-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+/* Awards */
+.ibx-award-item {
+  padding: 5px 0;
+  border-top: 1px dotted var(--border);
+  font-size: 0.75rem;
+}
+.ibx-award-item:first-child { border-top: none; }
+.ibx-award-title { color: var(--text-primary); }
+
+/* Notes */
+.ibx-notes {
+  font-style: italic;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+/* Era / historical period tags */
+.ibx-part-of { border-top: 1px solid var(--border); background: var(--bg-elevated); }
+.ibx-era-tag {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 0.63rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--link);
+  border: 1px solid var(--border);
+  background: rgba(44, 74, 122, 0.05);
+  padding: 2px 7px;
+  border-radius: 2px;
+  margin: 0 4px 4px 0;
+  cursor: default;
+}
+
+/* Criminal record */
+.ibx-record-label { color: #a05040; margin-bottom: 8px; }
+.ibx-charge-card {
+  border: 1px solid rgba(160, 80, 64, 0.35);
+  background: rgba(160, 80, 64, 0.04);
+  padding: 8px 10px 10px;
+}
+.ibx-charge-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(160, 80, 64, 0.22);
+  margin-bottom: 6px;
+}
+.ibx-charge-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: #903830;
+}
+.ibx-charge-count {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.ibx-charge-grid {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  column-gap: 8px;
+  row-gap: 3px;
+  margin: 0;
+  font-size: 0.72rem;
+}
+.ibx-charge-grid dt {
+  color: var(--text-muted);
+  font-variant: small-caps;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+}
+.ibx-charge-grid dd { margin: 0; color: var(--text-secondary); }
+.ibx-guilty { color: #903830; font-weight: 600; }
+.ibx-charge-notes {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dotted rgba(160, 80, 64, 0.25);
+  font-style: italic;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .ibx-person { float: none; width: 100%; margin: 0 0 20px 0; }
+}
