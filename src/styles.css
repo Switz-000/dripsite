@@ -62,7 +62,7 @@ a {
 }
 a:hover { color: var(--link-hover); text-decoration-color: var(--link-hover); }
 a:visited { color: var(--link-visited); }
-::selection { background: #c8d8f0; }
+::selection { background: rgba(74, 143, 245, 0.28); }
 
 /* ── Layout ── */
 .layout { display: flex; min-height: 100vh; }

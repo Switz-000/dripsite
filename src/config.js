@@ -116,6 +116,9 @@ export const THEME = {
   'link-visited': '#9b8ec4',
 
   // Borders — cooled down considerably
-  'border':       '#2a3441',   // cool dark steel
-  'rule':         '#141b24',   // deep navy rule (was warm #1a1814)
+  'border':        '#2a3441',   // cool dark steel
+  'border-strong': '#3a4d60',   // stronger border for infobox outlines, scrollbar
+  'rule':          '#141b24',   // deep navy rule (was warm #1a1814)
+  'bg-rule':       '#1c2530',   // subtle row separator inside infoboxes/lifelines
+  'link-missing':  '#4a5a6a',   // muted steel-blue for missing wikilinks
 }
