@@ -52,20 +52,24 @@ function Field({ value, wikilinkFn, missing = '—' }) {
 }
 
 // ── Data utilities ──────────────────────────────────────────────────
+// Deep emptiness test — treats null, '', empty arrays and all-empty objects as
+// empty, recursively. Boolean `false` also counts as empty, so template default
+// flags like `posthumous: false` don't make an otherwise-blank entry look filled.
+function hasVal(v) {
+  if (v == null) return false
+  if (typeof v === 'boolean') return v === true
+  if (Array.isArray(v)) return v.some(hasVal)
+  if (typeof v === 'object') return Object.values(v).some(hasVal)
+  return String(v).trim() !== ''
+}
+
 function compact(arr) {
   if (!Array.isArray(arr)) return []
-  return arr.filter(x => {
-    if (x == null) return false
-    if (typeof x !== 'object') return String(x) !== ''
-    return Object.values(x).some(v => v != null && v !== '')
-  })
+  return arr.filter(hasVal)
 }
 
 function has(v) {
-  if (v == null) return false
-  if (Array.isArray(v)) return compact(v).length > 0
-  if (typeof v === 'object') return Object.values(v).some(x => x != null && x !== '')
-  return String(v) !== ''
+  return hasVal(v)
 }
 
 // Strip [[wikilink]] brackets for plain text display
@@ -111,6 +115,25 @@ function normalizeMeta(raw) {
       typeof c === 'string' ? { charge: c } : c
     )
   }
+  // offices: new schema renamed start_year/end_year (was start/end) and
+  // parties[] (was party). Map to a single internal shape so the rest of the
+  // component reads start/end/_parties regardless of source format. _parties is
+  // kept as the raw array (may contain [[wikilinks]]) so each consumer can decide
+  // to render it as links (offices list) or as plain text (lifeline).
+  if (Array.isArray(rec.offices)) {
+    rec.offices = rec.offices.map(o => {
+      if (!o || typeof o !== 'object') return o
+      const partyList = Array.isArray(o.parties)
+        ? o.parties.filter(Boolean)
+        : (o.party ? [o.party] : [])
+      return {
+        ...o,
+        start: o.start_year ?? o.start ?? null,
+        end: o.end_year ?? o.end ?? null,
+        _parties: partyList,
+      }
+    })
+  }
   return rec
 }
 
@@ -141,7 +164,7 @@ function shortOffice(o) {
     .replace(/ of the Federated.*$/, '')
     .replace(/ of the .*$/, '')
     .replace(/ of .*$/, '')
-    .trim() || (o.party || '')
+    .trim() || ((o._parties || []).map(p => stripWL(String(p))).join(', ') || '')
 }
 
 function shortenTitle(t) {
@@ -203,7 +226,7 @@ function titleKicker(rec) {
 
 function buildTabs(rec) {
   const tabs = []
-  if (['native_name','aliases','sex','ethnicity','religion','citizenship','nationality','birth','death','enhanced']
+  if (['native_name','aliases','sex','ethnicity','religion','citizenship','nationality','birth','death','spouse','children_count','enhanced']
       .some(k => has(rec[k]))) {
     tabs.push({ id: 'facts', label: 'Facts' })
   }
@@ -211,7 +234,7 @@ function buildTabs(rec) {
       .some(k => has(rec[k]))) {
     tabs.push({ id: 'career', label: 'Career' })
   }
-  if (['known_for','awards','historical_period','written_works'].some(k => has(rec[k]))) {
+  if (['known_for','awards','era','historical_period','written_works'].some(k => has(rec[k]))) {
     tabs.push({ id: 'legacy', label: 'Legacy' })
   }
   if (has(rec.criminal_charges)) {
@@ -302,6 +325,7 @@ function FactsPanel({ rec, wikilinkFn }) {
         <Row label="Born">
           {rec.birth.city && <Field value={rec.birth.city} wikilinkFn={wikilinkFn} />}
           {rec.birth.state && <>, <Field value={rec.birth.state} wikilinkFn={wikilinkFn} /></>}
+          {rec.birth.country && <>, <Field value={rec.birth.country} wikilinkFn={wikilinkFn} /></>}
           {rec.birth.year && <div className="ibx-meta">{rec.birth.year}</div>}
         </Row>
       )}
@@ -309,6 +333,7 @@ function FactsPanel({ rec, wikilinkFn }) {
         <Row label="Died">
           {rec.death.city && <Field value={rec.death.city} wikilinkFn={wikilinkFn} />}
           {rec.death.state && <>, <Field value={rec.death.state} wikilinkFn={wikilinkFn} /></>}
+          {rec.death.country && <>, <Field value={rec.death.country} wikilinkFn={wikilinkFn} /></>}
           {rec.death.year && (
             <div className="ibx-meta">
               {rec.death.year}{rec.death.cause && ` · ${rec.death.cause}`}
@@ -316,7 +341,11 @@ function FactsPanel({ rec, wikilinkFn }) {
           )}
         </Row>
       )}
-      {rec.enhanced != null && (
+      {has(rec.spouse) && <Row label="Spouse"><W v={rec.spouse} /></Row>}
+      {rec.children_count != null && rec.children_count !== '' && (
+        <Row label="Children">{rec.children_count}</Row>
+      )}
+      {rec.enhanced != null && !(rec.death?.year != null && rec.death.year < 2055) && (
         <Row label="Enhanced">
           {rec.enhanced
             ? <span className="ibx-yes">Yes</span>
@@ -328,6 +357,10 @@ function FactsPanel({ rec, wikilinkFn }) {
 }
 
 // ── Career panel ────────────────────────────────────────────────────
+// IMPORTANT: the Lifeline must NEVER render clickable links. Every value here
+// (title, location, party, notes) is printed as plain text, so callers building
+// `events` must strip [[wikilinks]] with stripWL() before passing values in —
+// do not render <Field>/<Link> inside this component.
 function Lifeline({ events }) {
   return (
     <div className="ibx-lifeline">
@@ -382,8 +415,11 @@ function CareerPanel({ rec, wikilinkFn }) {
         year: o.start, kind: 'office',
         title: o.title || 'Office',
         span: o.end ? `${o.start}–${o.end}` : `${o.start}–?`,
-        party: [o.party, o.appointer ? `appt. ${stripWL(String(o.appointer))}` : null]
-          .filter(Boolean).join(' · ') || null,
+        location: o.employer ? stripWL(String(o.employer)) : null,
+        party: [
+          o._parties?.length ? o._parties.map(p => stripWL(String(p))).join(', ') : null,
+          o.appointer ? `appt. ${stripWL(String(o.appointer))}` : null,
+        ].filter(Boolean).join(' · ') || null,
         notes: o.notes || null,
       })
     })
@@ -419,11 +455,18 @@ function CareerPanel({ rec, wikilinkFn }) {
         <div className="ibx-section">
           <div className="ibx-section-label">Occupations</div>
           <div>
-            {occ.map((o, i) => (
-              <span key={i} className="ibx-chip">
-                {typeof o === 'string' ? o : (o.title || '')}
-              </span>
-            ))}
+            {occ.map((o, i) => {
+              const label = typeof o === 'string' ? o : (o.title || '')
+              const span = typeof o === 'object' && (o.start_year || o.end_year)
+                ? `${o.start_year ?? '?'}–${o.end_year ?? 'present'}`
+                : null
+              return (
+                <span key={i} className="ibx-chip">
+                  {label}
+                  {span && <span className="ibx-meta" style={{ marginLeft: 5 }}>{span}</span>}
+                </span>
+              )
+            })}
           </div>
         </div>
       )}
@@ -447,9 +490,14 @@ function CareerPanel({ rec, wikilinkFn }) {
           {offices.map((o, i) => (
             <div key={i} className="ibx-office-item">
               <div className="ibx-office-title">{o.title}</div>
+              {o.employer && (
+                <div className="ibx-meta"><Field value={o.employer} wikilinkFn={wikilinkFn} /></div>
+              )}
               <div className="ibx-meta">
-                {o.start ?? '?'}–{o.end ?? '?'}{o.party && ` · ${o.party}`}
+                {o.start ?? '?'}–{o.end ?? '?'}
+                {o._parties?.length > 0 && <> · <Field value={o._parties} wikilinkFn={wikilinkFn} /></>}
               </div>
+              {o.notes && <div className="ibx-notes">{o.notes}</div>}
             </div>
           ))}
         </div>
@@ -528,7 +576,7 @@ function LegacyPanel({ rec, wikilinkFn }) {
   const known = compact(rec.known_for)
   const awards = compact(rec.awards)
   const works = compact(rec.written_works)
-  const eras = rec.historical_period
+  const eras = rec.era ?? rec.historical_period
 
   return (
     <div>
@@ -578,7 +626,7 @@ function LegacyPanel({ rec, wikilinkFn }) {
             <div key={i} className="ibx-award-item">
               <div className="ibx-award-title">{a.title}</div>
               <div className="ibx-meta">
-                {a.awarded && `${a.awarded} · `}
+                {(a.awarded_year ?? a.awarded) && `${a.awarded_year ?? a.awarded} · `}
                 <Field value={a.granted_by} wikilinkFn={wikilinkFn} />
                 {a.country && <>, <Field value={a.country} wikilinkFn={wikilinkFn} /></>}
                 {a.posthumous && ' · posthumous'}
@@ -616,9 +664,14 @@ function RecordPanel({ rec }) {
             {c.counts && <span className="ibx-charge-count">×{c.counts}</span>}
           </div>
           <dl className="ibx-charge-grid">
+            {c.charged_year && <><dt>Charged</dt><dd>{c.charged_year}</dd></>}
             {c.plea     && <><dt>Plea</dt>    <dd>{c.plea}</dd></>}
             {c.verdict  && <><dt>Verdict</dt> <dd className={/guilty/i.test(c.verdict) ? 'ibx-guilty' : ''}>{c.verdict}</dd></>}
+            {c.verdict_year && <><dt>Verdict year</dt><dd>{c.verdict_year}</dd></>}
             {c.sentence && <><dt>Sentence</dt><dd>{c.sentence}</dd></>}
+            {c.served != null && c.served !== '' && (
+              <><dt>Served</dt><dd>{typeof c.served === 'boolean' ? (c.served ? 'Yes' : 'No') : c.served}</dd></>
+            )}
             {c.in_absentia === true && <><dt>Trial</dt><dd>In absentia</dd></>}
           </dl>
           {c.notes && <div className="ibx-charge-notes">{c.notes}</div>}

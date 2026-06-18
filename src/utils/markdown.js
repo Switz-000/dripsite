@@ -10,8 +10,25 @@ export function parseFrontmatter(raw) {
   return { meta: parseYAMLBlock(match[1]), body: match[2].trim() }
 }
 
+// Strip an inline YAML `#` comment from a line. A `#` only starts a comment when
+// it is at the start of the (trimmed) content or preceded by whitespace, and is
+// not inside single/double quotes — so values like [[Page#Section]] or "a#b" and
+// URLs are preserved, while `key:   # note` and full-line `# heading` are removed.
+function stripComment(line) {
+  let inS = false, inD = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (c === "'" && !inD) inS = !inS
+    else if (c === '"' && !inS) inD = !inD
+    else if (c === '#' && !inS && !inD && (i === 0 || /\s/.test(line[i - 1]))) {
+      return line.slice(0, i).replace(/\s+$/, '')
+    }
+  }
+  return line
+}
+
 function parseYAMLBlock(src) {
-  const lines = src.split('\n').map(l => l.replace(/\t/g, '  '))
+  const lines = src.split('\n').map(l => stripComment(l.replace(/\t/g, '  ')))
   let idx = 0
 
   const isBlank = l => l == null || /^\s*(#.*)?$/.test(l)
