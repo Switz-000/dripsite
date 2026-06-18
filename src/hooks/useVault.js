@@ -13,6 +13,7 @@ import {
   extractSummary,
 } from '../utils/markdown'
 import { fetchClassSchemas } from '../utils/classSchema'
+import { geoPathsFromTree, buildGeoHierarchy } from '../utils/geo'
 
 // Module-level caches — survive re-renders and re-mounts
 export const articleCache = new Map()
@@ -143,6 +144,46 @@ export function useClassSchemas() {
   }, [])
 
   return schemas  // null while loading, {} on error, { typeName: [...] } when ready
+}
+
+// ── Geography hierarchy (Country › State › City) ──────────────
+// Fetches country/state/city frontmatter (when enabled) and builds the
+// foldable hierarchy used by the Birth filter. Result cached per tree.
+let _geoCache = null
+let _geoTreeRef = null
+let _geoPending = null
+
+export function useGeoHierarchy(tree, enabled) {
+  const [hierarchy, setHierarchy] = useState(_geoTreeRef === tree ? _geoCache : null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!enabled || !tree) return
+    if (_geoTreeRef === tree && _geoCache) { setHierarchy(_geoCache); return }
+
+    const paths = geoPathsFromTree(tree)
+    if (paths.length === 0) {
+      _geoCache = buildGeoHierarchy(tree, metaCache)
+      _geoTreeRef = tree
+      setHierarchy(_geoCache)
+      return
+    }
+
+    setLoading(true)
+    if (!_geoPending || _geoTreeRef !== tree) {
+      _geoTreeRef = tree
+      _geoPending = Promise.all(paths.map(p => fetchMeta(p).catch(() => null)))
+        .then(() => {
+          _geoCache = buildGeoHierarchy(tree, metaCache)
+          _geoPending = null
+          return _geoCache
+        })
+    }
+    _geoPending.then(h => { setHierarchy(h); setLoading(false) })
+                .catch(() => setLoading(false))
+  }, [tree, enabled])
+
+  return { hierarchy, loading }
 }
 
 // ── Lightweight frontmatter fetch ─────────────────────────────

@@ -253,7 +253,9 @@ a:visited { color: var(--link-visited); }
 .filter-btn:hover { border-color: var(--text-primary); color: var(--text-primary); }
 .filter-btn.active { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg-surface); }
 
-.article-list { border-top: 2px solid var(--rule); }
+/* min-height keeps the page from collapsing when a filter narrows results,
+   so the scroll position stays put instead of clamping up to the filters. */
+.article-list { border-top: 2px solid var(--rule); min-height: 75vh; }
 .article-list-item { display: flex; gap: 14px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); transition: padding var(--transition); }
 .article-list-item:hover { padding-left: 5px; }
 .article-list-item a { font-family: var(--font-body); font-size: 0.9rem; color: var(--text-primary); text-decoration: none; flex: 1; }
@@ -437,6 +439,58 @@ a:visited { color: var(--link-visited); }
 }
 .subfilter-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
 .subfilter-btn.active { background: var(--text-accent); border-color: var(--text-accent); color: var(--bg-page); }
+
+/* ── Birth filter accordion ── */
+.birth-filter { gap: 6px; }
+.birth-tree {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.birth-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+.birth-row.selected .birth-name {
+  background: var(--text-accent);
+  border-color: var(--text-accent);
+  color: var(--bg-page);
+}
+.birth-caret,
+.birth-caret-spacer {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.birth-caret {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.birth-caret:hover { color: var(--text-primary); }
+.birth-name {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.birth-name:hover { border-color: var(--border); color: var(--text-primary); }
+.birth-row-d0 .birth-name { font-weight: 600; color: var(--text-primary); }
+.birth-row-d1 .birth-name { font-size: 0.7rem; }
+.birth-row-d2 .birth-name { font-size: 0.68rem; color: var(--text-muted); }
 
 /* count badge on type filter buttons */
 .filter-btn-count {

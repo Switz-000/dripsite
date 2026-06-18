@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useFileTree, useClassSchemas, fetchMeta, metaCache, pathToSlug } from '../hooks/useVault'
+import { useFileTree, useClassSchemas, useGeoHierarchy, fetchMeta, metaCache, pathToSlug } from '../hooks/useVault'
+import { stripWL } from '../utils/geo'
 import { Loading, ErrorState } from '../components/Loading'
 
 // ── Path → type detection ──────────────────────────────────────
@@ -65,7 +66,26 @@ function typeLabel(type) {
 
 // ── Sub-filter value matching ──────────────────────────────────
 function normalizeVal(v) {
-  return v == null ? '' : String(v).toLowerCase().trim()
+  if (v == null) return ''
+  // strip [[wikilink]] so plain filter options match wikilink-valued fields
+  // (e.g. birth.country: "[[Susia]]"). Idempotent for plain text.
+  return stripWL(v).toLowerCase().trim()
+}
+
+// Derived criminal-record status: "Clean record" | "Convict" | "Acquitted"
+const RECORD_OPTIONS = ['Clean record', 'Convict', 'Acquitted']
+function recordStatus(meta) {
+  const raw = meta.criminal_charges
+  const charges = (Array.isArray(raw) ? raw : (raw != null ? [raw] : []))
+    .filter(c => c && (typeof c === 'object'
+      ? Object.values(c).some(v => v != null && v !== '')
+      : String(c).trim() !== ''))
+  if (charges.length === 0) return 'Clean record'
+  const convicted = charges.some(c => {
+    const v = String((c && typeof c === 'object' ? c.verdict : c) || '').toLowerCase()
+    return /guilty|convict/.test(v) && !/not\s+guilty|acquit/.test(v)
+  })
+  return convicted ? 'Convict' : 'Acquitted'
 }
 
 function articleMatchesSubFilters(meta, activeSubFilters) {
@@ -83,6 +103,14 @@ function articleMatchesSubFilters(meta, activeSubFilters) {
         item && typeof item === 'object' && selected.has(normalizeVal(item[child]))
       )
       if (!match) return false
+    } else if (key === 'record_status') {
+      if (!selected.has(normalizeVal(recordStatus(meta)))) return false
+    } else if (key === 'occupation') {
+      // occupation: array of strings OR {title} objects (or a single value)
+      const raw = meta.occupation
+      const list = Array.isArray(raw) ? raw : (raw != null ? [raw] : [])
+      const titles = list.map(e => (e && typeof e === 'object') ? e.title : e)
+      if (!titles.some(t => selected.has(normalizeVal(t)))) return false
     } else {
       // Top-level field — may be scalar or array
       const fieldVal = meta[key]
@@ -152,6 +180,133 @@ function SubFilterRow({ fieldKey, label, options, active, onToggle }) {
   )
 }
 
+// ── Occupation filter (options derived from loaded person articles) ──
+function OccupationFilter({ options, active, onToggle }) {
+  if (options.length === 0) return null
+  return (
+    <div className="subfilter-panel">
+      <SubFilterRow
+        fieldKey="occupation"
+        label="Occupation"
+        options={options}
+        active={active}
+        onToggle={onToggle}
+      />
+    </div>
+  )
+}
+
+// ── Criminal record filter (derived status) ──
+function RecordFilter({ active, onToggle }) {
+  return (
+    <div className="subfilter-panel">
+      <SubFilterRow
+        fieldKey="record_status"
+        label="Criminal record"
+        options={RECORD_OPTIONS}
+        active={active}
+        onToggle={onToggle}
+      />
+    </div>
+  )
+}
+
+// ── Birth filter — foldable Country › State › City accordion ──
+// Each level is independently selectable (writes birth.country/state/city);
+// carets only expand/collapse to reveal children.
+function BirthRow({ depth, label, selected, onSelect, expandable, expanded, onExpand }) {
+  return (
+    <div
+      className={'birth-row birth-row-d' + depth + (selected ? ' selected' : '')}
+      style={{ paddingLeft: 8 + depth * 16 }}
+    >
+      {expandable ? (
+        <button className="birth-caret" onClick={onExpand} aria-label="expand">
+          {expanded ? '▾' : '▸'}
+        </button>
+      ) : <span className="birth-caret-spacer" />}
+      <button className="birth-name" onClick={onSelect}>{label}</button>
+    </div>
+  )
+}
+
+function BirthFilter({ hierarchy, loading, activeSubFilters, onToggle }) {
+  const [openCountries, setOpenCountries] = useState(() => new Set())
+  const [openStates, setOpenStates] = useState(() => new Set())
+
+  const selCountry = activeSubFilters.get('birth.country') ?? new Set()
+  const selState   = activeSubFilters.get('birth.state')   ?? new Set()
+  const selCity    = activeSubFilters.get('birth.city')    ?? new Set()
+
+  function toggleSet(setter, key) {
+    setter(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  return (
+    <div className="subfilter-panel birth-filter">
+      <span className="subfilter-group-label">Birth</span>
+      {loading && <div className="subfilter-loading">Loading geography…</div>}
+      {!loading && hierarchy && hierarchy.countries.length === 0 &&
+        <div className="subfilter-loading">No geography found.</div>}
+      <div className="birth-tree">
+        {hierarchy && hierarchy.countries.map(country => {
+          const cKey = country.name.toLowerCase()
+          const cOpen = openCountries.has(cKey)
+          const states = hierarchy.statesByCountry.get(cKey)?.items ?? []
+          return (
+            <div key={cKey}>
+              <BirthRow
+                depth={0}
+                label={country.name}
+                selected={selCountry.has(cKey)}
+                onSelect={() => onToggle('birth.country', cKey)}
+                expandable={states.length > 0}
+                expanded={cOpen}
+                onExpand={() => toggleSet(setOpenCountries, cKey)}
+              />
+              {cOpen && states.map(state => {
+                const sKey = state.name.toLowerCase()
+                const sOpen = openStates.has(sKey)
+                const cities = hierarchy.citiesByState.get(sKey)?.items ?? []
+                return (
+                  <div key={sKey}>
+                    <BirthRow
+                      depth={1}
+                      label={state.name}
+                      selected={selState.has(sKey)}
+                      onSelect={() => onToggle('birth.state', sKey)}
+                      expandable={cities.length > 0}
+                      expanded={sOpen}
+                      onExpand={() => toggleSet(setOpenStates, sKey)}
+                    />
+                    {sOpen && cities.map(city => {
+                      const ciKey = city.name.toLowerCase()
+                      return (
+                        <BirthRow
+                          key={ciKey}
+                          depth={2}
+                          label={city.name}
+                          selected={selCity.has(ciKey)}
+                          onSelect={() => onToggle('birth.city', ciKey)}
+                          expandable={false}
+                        />
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────────
 export default function BrowsePage() {
   const { tree, loading, error } = useFileTree()
@@ -195,11 +350,50 @@ export default function BrowsePage() {
 
   // ── Single selected type (sub-filters only for one type at a time) ──
   const selectedType   = activeTypes.size === 1 ? [...activeTypes][0] : null
-  const selectedSchema = schemas && selectedType ? (schemas[selectedType] ?? null) : null
+  const rawSchema      = schemas && selectedType ? (schemas[selectedType] ?? null) : null
+  const isPerson       = selectedType === 'person'
+
+  // Hide a few overly-niche person sub-filters (replaced by the Criminal record filter).
+  const HIDDEN_FILTERS = useMemo(() => new Set(['genre', 'plea', 'verdict']), [])
+  const selectedSchema = useMemo(() => {
+    if (!rawSchema || !isPerson) return rawSchema
+    return rawSchema
+      .map(entry => {
+        if (entry.isGroup) {
+          const children = entry.children.filter(c => !HIDDEN_FILTERS.has(c.name))
+          return children.length ? { ...entry, children } : null
+        }
+        return HIDDEN_FILTERS.has(entry.name) ? null : entry
+      })
+      .filter(Boolean)
+  }, [rawSchema, isPerson, HIDDEN_FILTERS])
+
+  // Geography hierarchy for the Birth filter (fetched only for People)
+  const { hierarchy: geoHierarchy, loading: geoLoading } = useGeoHierarchy(tree, isPerson)
+
+  // Occupation options derived from loaded person articles
+  const occupationOptions = useMemo(() => {
+    if (!isPerson || !tree) return []
+    const set = new Map() // normalized -> display
+    tree.forEach(f => {
+      if (guessTypeFromPath(f.path) !== 'person') return
+      const meta = metaCache.get(f.path)
+      if (!meta) return
+      const raw = meta.occupation
+      const list = Array.isArray(raw) ? raw : (raw != null ? [raw] : [])
+      list.forEach(e => {
+        const title = (e && typeof e === 'object') ? e.title : e
+        const norm = normalizeVal(title)
+        if (norm && !set.has(norm)) set.set(norm, String(title).trim())
+      })
+    })
+    return [...set.values()].sort((a, b) => a.localeCompare(b))
+  }, [isPerson, tree, metaVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetch frontmatter when a type with a schema is selected ──
+  // Also fetch for People (no schema required) so Occupation/Birth filters work.
   useEffect(() => {
-    if (!selectedSchema || !tree || !selectedType) return
+    if ((!selectedSchema && !isPerson) || !tree || !selectedType) return
     if (fetchedTypes.has(selectedType)) return
     if (fetchingRef.current.has(selectedType)) return
 
@@ -331,6 +525,29 @@ export default function BrowsePage() {
             activeSubFilters={activeSubFilters}
             onToggle={handleSubFilter}
             metaLoading={metaLoading}
+          />
+        )}
+
+        {/* ── Person-only custom filters: Occupation + Birth ── */}
+        {isPerson && (
+          <OccupationFilter
+            options={occupationOptions}
+            active={activeSubFilters.get('occupation') ?? new Set()}
+            onToggle={handleSubFilter}
+          />
+        )}
+        {isPerson && (
+          <RecordFilter
+            active={activeSubFilters.get('record_status') ?? new Set()}
+            onToggle={handleSubFilter}
+          />
+        )}
+        {isPerson && (
+          <BirthFilter
+            hierarchy={geoHierarchy}
+            loading={geoLoading}
+            activeSubFilters={activeSubFilters}
+            onToggle={handleSubFilter}
           />
         )}
 
