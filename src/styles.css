@@ -212,6 +212,9 @@ a:visited { color: var(--link-visited); }
 /* ── Infobox ── */
 .infobox { float: right; clear: right; margin: 0 0 20px 28px; width: 270px; background: var(--bg-surface); border: 1px solid var(--border-strong); font-size: 0.77rem; font-family: var(--font-ui); }
 .infobox-title { background: var(--bg-elevated); padding: 8px 12px; font-size: 0.78rem; font-weight: 700; text-align: center; color: var(--text-primary); border-bottom: 1px solid var(--border-strong); font-family: var(--font-display); font-style: italic; }
+.infobox-flag-wrap { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); }
+.infobox-flag-wrap img { display: block; width: 100%; border: 1px solid var(--border-strong); }
+.infobox-flag-caption { text-align: center; font-family: var(--font-ui); font-size: 0.62rem; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 6px; }
 .infobox-image-wrap { border-bottom: 1px solid var(--border); }
 .infobox-image-wrap img { display: block; width: 100%; max-height: 220px; object-fit: cover; object-position: center top; }
 .infobox-row { display: flex; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); line-height: 1.45; align-items: flex-start; }
@@ -541,6 +544,42 @@ a:visited { color: var(--link-visited); }
   object-position: center top;
   border-bottom: 1px solid var(--border);
 }
+
+/* Flag previews: compact, auto-height horizontal header */
+.wiki-popup.is-flag-popup { width: 232px; }
+.wiki-popup-flagrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+.wiki-popup-flag {
+  width: 42px;
+  max-height: 30px;
+  object-fit: contain;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+  display: block;
+}
+.wiki-popup-flagrow .wiki-popup-heading { min-width: 0; }
+.wiki-popup-flagrow .wiki-popup-type { margin-bottom: 1px; }
+.wiki-popup-flagrow .wiki-popup-title {
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+/* ── Small inline flag chips (browse list, map panel, tooltips) ── */
+.flag-chip {
+  display: inline-block;
+  width: 22px;
+  height: 14px;
+  object-fit: cover;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+  align-self: center;
+}
+.flag-chip-empty { border: 1px dashed var(--border); }
 
 .wiki-popup-body {
   padding: 8px 10px 9px;

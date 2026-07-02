@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
-import { useArticle, useFileTree } from '../hooks/useVault'
+import { useArticle, useFileTree, useFlags } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
-import { wikilinkToSlug } from '../utils/github'
+import { wikilinkToSlug, flagUrlFor } from '../utils/github'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import PersonInfobox from '../components/PersonInfobox'
@@ -16,6 +16,7 @@ export default function ArticlePage() {
   const slug = params['*']
   const { article, loading, error } = useArticle(slug)
   const { tree } = useFileTree()
+  const flags = useFlags()
 
   const bodyRef = useRef(null)
   const [popup, setPopup] = useState({ visible: false, x: 0, y: 0, data: null, slug: null })
@@ -109,6 +110,12 @@ export default function ArticlePage() {
   const infoboxImage = HTML_IMG_RE.exec(article.html)?.[1] ?? null
   const wikilinkFn = tree ? (text) => wikilinkToSlug(text, tree) : null
 
+  // Country flag — matched by article filename against "Country Flags" images
+  const articleBaseName = article.path.split('/').pop().replace(/\.md$/, '')
+  const flagUrl = article.meta.type === 'country'
+    ? (flagUrlFor(articleBaseName, flags) || flagUrlFor(article.title, flags))
+    : null
+
   return (
     <>
     <div className="page-inner">
@@ -133,7 +140,7 @@ export default function ArticlePage() {
       <div className="article-body" ref={bodyRef}>
         {article.meta.type === 'person'
           ? <PersonInfobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
-          : <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
+          : <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} flagUrl={flagUrl} wikilinkFn={wikilinkFn} />
         }
         <div dangerouslySetInnerHTML={{ __html: article.html }} />
       </div>

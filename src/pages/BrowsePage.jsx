@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useFileTree, useClassSchemas, useGeoHierarchy, fetchMeta, metaCache, pathToSlug } from '../hooks/useVault'
+import { useFileTree, useClassSchemas, useGeoHierarchy, useFlags, fetchMeta, metaCache, pathToSlug } from '../hooks/useVault'
+import { flagUrlFor } from '../utils/github'
 import { stripWL } from '../utils/geo'
 import { Loading, ErrorState } from '../components/Loading'
 
@@ -311,6 +312,7 @@ function BirthFilter({ hierarchy, loading, activeSubFilters, onToggle }) {
 export default function BrowsePage() {
   const { tree, loading, error } = useFileTree()
   const schemas = useClassSchemas()
+  const flags = useFlags()
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [localSearch, setLocalSearch]   = useState('')
@@ -558,12 +560,16 @@ export default function BrowsePage() {
       </div>
 
       <div className="article-list">
-        {items.map(item => (
-          <div className="article-list-item" key={item.slug}>
-            <Link to={`/article/${item.slug}`}>{item.title}</Link>
-            <span className="item-path">{item.folder}</span>
-          </div>
-        ))}
+        {items.map(item => {
+          const flag = item.type === 'country' ? flagUrlFor(item.title, flags) : null
+          return (
+            <div className="article-list-item" key={item.slug}>
+              {flag && <img src={flag} alt="" className="flag-chip" loading="lazy" />}
+              <Link to={`/article/${item.slug}`}>{item.title}</Link>
+              <span className="item-path">{item.folder}</span>
+            </div>
+          )
+        })}
         {items.length === 0 && (
           <div className="browse-empty">No articles match this filter.</div>
         )}

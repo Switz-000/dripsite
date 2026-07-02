@@ -19,29 +19,45 @@ export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onM
   const typeLabel = data.type ? getTypeLabel({ type: data.type }) : null
   const summaryHtml = data.summary ? marked.parseInline(data.summary) : ''
 
+  const heading = (
+    <div className="wiki-popup-heading">
+      {typeLabel && <div className="wiki-popup-type">{typeLabel}</div>}
+      <div className="wiki-popup-title">{data.title}</div>
+    </div>
+  )
+
   return (
     <Link
       to={`/article/${slug}`}
-      className={`wiki-popup${visible ? ' is-visible' : ''}`}
+      className={`wiki-popup${visible ? ' is-visible' : ''}${data.imageIsFlag ? ' is-flag-popup' : ''}`}
       style={{ left, top }}
       role="tooltip"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onClose}
     >
-      {data.imageUrl && (
-        <img className="wiki-popup-image" src={data.imageUrl} alt="" loading="lazy" />
+      {data.imageIsFlag ? (
+        // Flags: compact horizontal header — flag left of type + title
+        <div className="wiki-popup-flagrow">
+          <img className="wiki-popup-flag" src={data.imageUrl} alt="" loading="lazy" />
+          {heading}
+        </div>
+      ) : (
+        <>
+          {data.imageUrl && (
+            <img className="wiki-popup-image" src={data.imageUrl} alt="" loading="lazy" />
+          )}
+          <div className="wiki-popup-body">
+            {heading}
+            {summaryHtml && (
+              <div
+                className="wiki-popup-summary"
+                dangerouslySetInnerHTML={{ __html: summaryHtml }}
+              />
+            )}
+          </div>
+        </>
       )}
-      <div className="wiki-popup-body">
-        {typeLabel && <div className="wiki-popup-type">{typeLabel}</div>}
-        <div className="wiki-popup-title">{data.title}</div>
-        {summaryHtml && (
-          <div
-            className="wiki-popup-summary"
-            dangerouslySetInnerHTML={{ __html: summaryHtml }}
-          />
-        )}
-      </div>
     </Link>
   )
 }

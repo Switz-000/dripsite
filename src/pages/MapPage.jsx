@@ -1,7 +1,15 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { pathToSlug } from '../hooks/useVault'
+import { pathToSlug, useFlags } from '../hooks/useVault'
+import { flagUrlFor } from '../utils/github'
 import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, STATE_VIEWBOXES, CITIES, CITY_VISIBILITY } from '../data/mapData'
+
+// Flag lookup for a map country — matched by article filename, then label
+function countryFlag(country, flags) {
+  if (!country || !flags) return null
+  const base = country.article?.split('/').pop()
+  return flagUrlFor(base, flags) || flagUrlFor(country.label, flags)
+}
 
 export default function MapPage() {
   const [view, setView] = useState('world')
@@ -12,6 +20,7 @@ export default function MapPage() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [viewBox, setViewBox] = useState('0 0 800 600')
   const navigate = useNavigate()
+  const flags = useFlags()
 
   function handleCountryClick(id) {
     const country = COUNTRIES.find(c => c.id === id)
@@ -89,12 +98,14 @@ export default function MapPage() {
     return (base[size] || 3) * scale
   }
 
+  const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null
   const tooltip = hoveredCity || (hoveredId
     ? {
         label:
-          COUNTRIES.find(c => c.id === hoveredId)?.label ||
+          hoveredCountry?.label ||
           (STATES[activeCountry?.id] || []).find(s => s.id === hoveredId)?.label ||
-          hoveredId
+          hoveredId,
+        flag: countryFlag(hoveredCountry, flags),
       }
     : null)
 
@@ -272,7 +283,10 @@ export default function MapPage() {
               pointerEvents: 'none',
               zIndex: 10,
             }}>
-              <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                {tooltip.flag && <img src={tooltip.flag} alt="" className="flag-chip" />}
+                <span style={{ fontWeight: 600 }}>{tooltip.label}</span>
+              </div>
               {tooltip.pop && <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginTop: 2 }}>Pop: {tooltip.pop}</div>}
               {tooltip.article && <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginTop: 2 }}>Click to open article</div>}
             </div>
@@ -305,29 +319,38 @@ export default function MapPage() {
           states={activeCountry ? STATES[activeCountry.id] : null}
           cities={visibleCities}
           onStateClick={handleStateClick}
+          flags={flags}
         />
       </div>
     </div>
   )
 }
 
-function InfoPanel({ view, country, state, states, cities, onStateClick }) {
+function InfoPanel({ view, country, state, states, cities, onStateClick, flags }) {
   const navigate = useNavigate()
 
   if (view === 'world') return (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem' }}>
       <SectionLabel>Nations</SectionLabel>
-      {COUNTRIES.map(c => (
-        <PanelRow key={c.id}>
-          <Link to={`/article/${pathToSlug(c.article)}`}>{c.label}</Link>
-        </PanelRow>
-      ))}
+      {COUNTRIES.map(c => {
+        const flag = countryFlag(c, flags)
+        return (
+          <PanelRow key={c.id}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {flag
+                ? <img src={flag} alt="" className="flag-chip" loading="lazy" />
+                : <span className="flag-chip flag-chip-empty" />}
+              <Link to={`/article/${pathToSlug(c.article)}`}>{c.label}</Link>
+            </div>
+          </PanelRow>
+        )
+      })}
     </div>
   )
 
   if ((view === 'country' || view === 'cities') && country) return (
     <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem' }}>
-      <PanelTitle title={country.label} article={country.article} />
+      <PanelTitle title={country.label} article={country.article} flagUrl={countryFlag(country, flags)} />
       {view === 'country' && (
         <>
           <SectionLabel>States</SectionLabel>
@@ -384,9 +407,19 @@ function InfoPanel({ view, country, state, states, cities, onStateClick }) {
   return null
 }
 
-function PanelTitle({ title, article }) {
+function PanelTitle({ title, article, flagUrl }) {
   return (
     <div style={{ marginBottom: 16 }}>
+      {flagUrl && (
+        <img
+          src={flagUrl}
+          alt={`Flag of ${title}`}
+          style={{
+            display: 'block', width: '100%', maxWidth: 180,
+            border: '1px solid var(--border-strong)', marginBottom: 10,
+          }}
+        />
+      )}
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>{title}</div>
       <Link to={`/article/${pathToSlug(article)}`} style={{ fontSize: '0.72rem', color: 'var(--link)' }}>Open article →</Link>
     </div>

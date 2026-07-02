@@ -20,13 +20,16 @@ export function isImageFilename(name) {
   return IMAGE_EXTENSIONS.has(name.slice(dot).toLowerCase())
 }
 
-export function imageUrl(filename) {
-  const path = `${REPO_CONFIG.imagesPath}/${filename}`
+export function rawFileUrl(path) {
   return (
     `https://raw.githubusercontent.com/` +
     `${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/${REPO_CONFIG.branch}/` +
     path.split('/').map(encodeURIComponent).join('/')
   )
+}
+
+export function imageUrl(filename) {
+  return rawFileUrl(`${REPO_CONFIG.imagesPath}/${filename}`)
 }
 
 function authHeaders() {
@@ -59,22 +62,71 @@ export function slugToVaultPath(slug) {
 }
 
 // ── File tree ─────────────────────────────────────────────────
+// One recursive tree fetch feeds both the markdown file tree and the
+// country flag map (images live under 00 - Meta/, which the md filter drops).
 let _treeCache = null
+let _flagMapCache = null
+let _rawTreePending = null
+
+export const FLAGS_PATH = `${REPO_CONFIG.imagesPath}/Country Flags`
+
+function buildFlagMap(rawTree) {
+  const map = new Map()
+  for (const f of rawTree) {
+    if (f.type !== 'blob') continue
+    if (!f.path.startsWith(FLAGS_PATH + '/')) continue
+    const filename = f.path.slice(FLAGS_PATH.length + 1)
+    if (filename.includes('/') || !isImageFilename(filename)) continue
+    const name = filename.slice(0, filename.lastIndexOf('.'))
+    map.set(name.toLowerCase().trim(), rawFileUrl(f.path))
+  }
+  return map
+}
+
+async function loadTrees() {
+  if (!_rawTreePending) {
+    const url = `${BASE}/git/trees/${REPO_CONFIG.branch}?recursive=1`
+    _rawTreePending = fetch(url, { headers: authHeaders() })
+      .then(res => {
+        if (!res.ok) throw new Error(`GitHub API error ${res.status} — check repo name and branch`)
+        return res.json()
+      })
+      .then(data => {
+        _flagMapCache = buildFlagMap(data.tree)
+        _treeCache = data.tree.filter(f =>
+          f.type === 'blob' &&
+          f.path.endsWith('.md') &&
+          !f.path.startsWith('.obsidian') &&
+          !f.path.includes('/.obsidian/') &&
+          !f.path.startsWith('00 - Meta/')
+        )
+      })
+      .catch(e => {
+        _rawTreePending = null
+        throw e
+      })
+  }
+  return _rawTreePending
+}
 
 export async function getFileTree() {
   if (_treeCache) return _treeCache
-  const url = `${BASE}/git/trees/${REPO_CONFIG.branch}?recursive=1`
-  const res = await fetch(url, { headers: authHeaders() })
-  if (!res.ok) throw new Error(`GitHub API error ${res.status} — check repo name and branch`)
-  const data = await res.json()
-  _treeCache = data.tree.filter(f =>
-    f.type === 'blob' &&
-    f.path.endsWith('.md') &&
-    !f.path.startsWith('.obsidian') &&
-    !f.path.includes('/.obsidian/') &&
-    !f.path.startsWith('00 - Meta/')
-  )
+  await loadTrees()
   return _treeCache
+}
+
+// ── Country flags ─────────────────────────────────────────────
+// Map of lowercase country name -> raw image URL, built from the
+// contents of "00 - Meta/Images/Country Flags" in the vault repo.
+export async function getFlagMap() {
+  if (_flagMapCache) return _flagMapCache
+  await loadTrees()
+  return _flagMapCache
+}
+
+export function flagUrlFor(name, flagMap) {
+  if (!name || !flagMap) return null
+  return flagMap.get(String(name).toLowerCase().trim()) || null
 }
 
 // ── Markdown fetching ─────────────────────────────────────────

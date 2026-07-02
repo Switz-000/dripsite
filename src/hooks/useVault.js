@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   getFileTree,
+  getFlagMap,
   fetchMarkdown,
   pathToSlug,
   slugToPath,
@@ -131,6 +132,26 @@ export function useSearchIndex() {
   }, [tree])
 
   return index
+}
+
+// ── Country flags ─────────────────────────────────────────────
+// Map of lowercase country name -> flag image URL. Shares the same
+// underlying tree fetch as useFileTree, so it costs no extra request.
+let _flagsCache = null
+
+export function useFlags() {
+  const [flags, setFlags] = useState(_flagsCache)
+
+  useEffect(() => {
+    if (_flagsCache) return
+    let alive = true
+    getFlagMap()
+      .then(m => { _flagsCache = m; if (alive) setFlags(m) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  return flags  // null while loading, Map when ready
 }
 
 // ── Class schemas ─────────────────────────────────────────────

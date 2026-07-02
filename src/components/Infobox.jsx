@@ -145,7 +145,7 @@ function renderValue(key, val, wikilinkFn) {
   return String(val)
 }
 
-export default function Infobox({ meta, title, imageUrl, wikilinkFn }) {
+export default function Infobox({ meta, title, imageUrl, flagUrl, wikilinkFn }) {
   if (!meta || Object.keys(meta).length === 0) return null
 
   const type = meta.type
@@ -170,11 +170,17 @@ export default function Infobox({ meta, title, imageUrl, wikilinkFn }) {
     rows.push({ label: humanizeKey(key), val })
   }
 
-  if (!rows.length && !imageUrl) return null
+  if (!rows.length && !imageUrl && !flagUrl) return null
 
   return (
     <div className="infobox">
       <div className="infobox-title">{title}</div>
+      {flagUrl && (
+        <div className="infobox-flag-wrap">
+          <img src={flagUrl} alt={`Flag of ${title}`} loading="lazy" />
+          <div className="infobox-flag-caption">Flag</div>
+        </div>
+      )}
       {imageUrl && (
         <div className="infobox-image-wrap">
           <img src={imageUrl} alt={title} />
