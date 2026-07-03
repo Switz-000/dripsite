@@ -58,6 +58,44 @@ export function geoPathsFromTree(tree) {
   return tree.filter(f => geoTypeFromPath(f.path) != null).map(f => f.path)
 }
 
+// ── Map data derivation helpers ─────────────────────────────────
+// Used by the map page to derive city/state facts from frontmatter.
+
+// Stable internal id from a display label: 'Neutral District' -> 'neutral_district'
+export function slugId(label) {
+  return String(label || '').toLowerCase().trim().replace(/\s+/g, '_')
+}
+
+// Latest population from frontmatter: scans population / population_YYYY keys,
+// returns the value of the highest year that is non-empty. Coerces numeric
+// strings like "1700000" or "1,700,000". Returns null when nothing usable.
+export function latestPopulation(meta) {
+  if (!meta) return null
+  let best = null
+  let bestYear = -1
+  for (const [key, val] of Object.entries(meta)) {
+    const m = key.match(/^population(?:_(\d+))?$/)
+    if (!m) continue
+    const n = typeof val === 'number'
+      ? val
+      : parseInt(String(val ?? '').replace(/[,\s]/g, ''), 10)
+    if (!Number.isFinite(n)) continue
+    const year = m[1] ? +m[1] : 0
+    if (year > bestYear) {
+      bestYear = year
+      best = n
+    }
+  }
+  return best
+}
+
+// City dot size class from population (null/unknown -> minor)
+export function citySize(pop) {
+  if (pop > 1_000_000) return 'major'
+  if (pop > 100_000) return 'medium'
+  return 'minor'
+}
+
 const UNGROUPED = 'Ungrouped'
 
 // Build the hierarchy from already-fetched metas (metaCache: Map<path, meta>).

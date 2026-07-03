@@ -14,7 +14,15 @@ import {
   extractSummary,
 } from '../utils/markdown'
 import { fetchClassSchemas } from '../utils/classSchema'
-import { geoPathsFromTree, buildGeoHierarchy } from '../utils/geo'
+import {
+  geoPathsFromTree,
+  buildGeoHierarchy,
+  geoTypeFromPath,
+  stripWL,
+  slugId,
+  latestPopulation,
+  citySize,
+} from '../utils/geo'
 
 // Module-level caches — survive re-renders and re-mounts
 export const articleCache = new Map()
@@ -205,6 +213,117 @@ export function useGeoHierarchy(tree, enabled) {
   }, [tree, enabled])
 
   return { hierarchy, loading }
+}
+
+// ── Map country geography ─────────────────────────────────────
+// Enriches the map's slim state/city definitions ({ label, path } and
+// { label, cx, cy }) with data derived from vault frontmatter: population,
+// size class, state assignment, capital marker, and the article slug.
+// All of a country's state+city frontmatter is fetched in one parallel
+// burst on first use (deduped by metaCache), then cached per country.
+const _countryGeoCache = new Map()   // country.id -> { states, cities }
+
+async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
+  // Candidate article paths: everything under the country's vault folder
+  // whose path marks it as a state or city article (any nesting depth).
+  const paths = country.folder
+    ? tree
+        .filter(f => {
+          if (!f.path.startsWith(country.folder + '/')) return false
+          const t = geoTypeFromPath(f.path)
+          return t === 'state' || t === 'city'
+        })
+        .map(f => f.path)
+    : []
+
+  // Country's own meta too — capital source for countries without states
+  const countryMetaPromise = country.article
+    ? fetchMeta(country.article + '.md').catch(() => null)
+    : Promise.resolve(null)
+
+  await Promise.all(paths.map(p => fetchMeta(p).catch(() => null)))
+  const countryMeta = await countryMetaPromise
+
+  // Filename (lowercase) -> article path, split by kind
+  const statePathByName = new Map()
+  const cityPathByName = new Map()
+  for (const p of paths) {
+    const base = p.split('/').pop().replace(/\.md$/, '').toLowerCase()
+    if (geoTypeFromPath(p) === 'state') statePathByName.set(base, p)
+    else cityPathByName.set(base, p)
+  }
+
+  const states = (stateDefs || []).map(s => {
+    const articlePath = statePathByName.get(s.label.toLowerCase()) || null
+    const meta = articlePath ? metaCache.get(articlePath) : null
+    return {
+      id: slugId(s.label),
+      label: s.label,
+      path: s.path,   // SVG shape
+      capital: meta ? stripWL(meta.capital) : null,
+      pop: latestPopulation(meta),
+      slug: articlePath ? pathToSlug(articlePath) : null,
+    }
+  })
+
+  const capitalByStateId = new Map(
+    states.map(st => [st.id, (st.capital || '').toLowerCase()])
+  )
+  const countryCapital = countryMeta ? stripWL(countryMeta.capital).toLowerCase() : ''
+
+  const cities = (cityDefs || []).map(c => {
+    const articlePath = cityPathByName.get(c.label.toLowerCase()) || null
+    const meta = articlePath ? metaCache.get(articlePath) : null
+    const pop = latestPopulation(meta)
+    const stateName = meta ? stripWL(meta.state) : ''
+    const stateId = stateName ? slugId(stateName) : null
+    const labelLower = c.label.toLowerCase()
+    return {
+      id: slugId(c.label),
+      label: c.label,
+      cx: c.cx,
+      cy: c.cy,
+      stateId,
+      pop,
+      size: citySize(pop),
+      capital:
+        (stateId != null && capitalByStateId.get(stateId) === labelLower) ||
+        (!!countryCapital && countryCapital === labelLower),
+      slug: articlePath ? pathToSlug(articlePath) : null,
+    }
+  })
+
+  return { states, cities }
+}
+
+export function useCountryGeo(country, stateDefs, cityDefs) {
+  const { tree } = useFileTree()
+  const [geo, setGeo] = useState(country ? _countryGeoCache.get(country.id) ?? null : null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!country) { setGeo(null); return }
+
+    const cached = _countryGeoCache.get(country.id)
+    if (cached) { setGeo(cached); return }
+    if (!tree) return
+
+    let alive = true
+    setGeo(null)
+    setLoading(true)
+
+    buildCountryGeo(country, stateDefs, cityDefs, tree)
+      .then(model => {
+        _countryGeoCache.set(country.id, model)
+        if (alive) { setGeo(model); setLoading(false) }
+      })
+      .catch(() => { if (alive) setLoading(false) })
+
+    return () => { alive = false }
+    // stateDefs/cityDefs are static module data keyed by country
+  }, [country, tree]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { geo, loading }
 }
 
 // ── Lightweight frontmatter fetch ─────────────────────────────
