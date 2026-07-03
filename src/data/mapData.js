@@ -175,23 +175,9 @@ export const STATES = {
 }
 
 // ── State viewboxes ───────────────────────────────────────────
-// Também vais preencher depois
-// Keys = state ids: the label lowercased with spaces as underscores
-// (e.g. 'Neutral District' -> neutral_district, 'Sužielaj' -> sužielaj)
-export const STATE_VIEWBOXES = {
-  susia: {
-    dripia:             '0 0 800 600',
-    postia:             '0 0 800 600',
-    'misocévia':        '0 0 800 600',
-    'sužielaj':         '0 0 800 600',
-    troli:              '0 0 800 600',
-    vitrika:            '0 0 800 600',
-    'orlítia':          '0 0 800 600',
-    new_celiolaj:       '0 0 800 600',
-    nessel:             '0 0 800 600',
-    neutral_district:   '0 0 800 600',
-  }
-}
+// No longer hand-authored. The map zooms into a state by computing the
+// bounding box of its `path` shape (see pathBBox/bboxViewBox in MapPage),
+// so there are no coordinates to keep in sync here.
 
 // ── Cities ────────────────────────────────────────────────────
 // One line per city: { label, cx, cy }. Everything else (population,
@@ -199,11 +185,28 @@ export const STATE_VIEWBOXES = {
 // cx e cy são as coordenadas no mapa — vais buscar ao Illustrator
 export const CITIES = {
   susia: [
-    { label: 'Neoveli',   cx: 0, cy: 0 },
-    { label: 'New Kentu', cx: 0, cy: 0 },
-    { label: 'Duolij',    cx: 0, cy: 0 },
-    { label: 'New Duloc', cx: 0, cy: 0 },
-    // adiciona mais cidades aqui
+    { label: 'Duolij', cx: 159.5, cy: 217.4 },
+    { label: 'Neoveli', cx: 139.1, cy: 208.2 },
+    { label: 'Poremoj', cx: 129.5, cy: 200.1 },
+    { label: 'Arkaime', cx: 159.9, cy: 209.7 },
+    { label: 'Jaffnidia', cx: 169.8, cy: 215.3 },
+    { label: 'Forchev', cx: 117.2, cy: 180.7 },
+    { label: 'Hortei', cx: 124.6, cy: 170.8 },
+    { label: 'New Kentu', cx: 142.2, cy: 176.8 },
+    { label: 'Vassénia', cx: 156.4, cy: 164.5 },
+    { label: 'New Duloc', cx: 145.8, cy: 259.8 },
+    { label: 'Nikuria', cx: 152.5, cy: 224.1 },
+    { label: 'Sužielaj city', cx: 237.2, cy: 252.4 },
+    { label: 'Niqueparje', cx: 252.7, cy: 172.2 },
+    { label: 'Yatovarlaj', cx: 272.8, cy: 219.2 },
+    { label: 'Lore-Kruji', cx: 192.3, cy: 213 },
+    { label: 'Noňofriye', cx: 134.6, cy: 289.2 },
+    { label: 'Piyejňe', cx: 162.1, cy: 245 },
+    { label: 'Kloshijie', cx: 120.6, cy: 140.2 },
+    { label: 'Velúria', cx: 79.2, cy: 360.1 },
+    { label: 'Hǎvesna', cx: 97.5, cy: 367.9 },
+    { label: 'Razrij', cx: 78.3, cy: 396.9 },
+    { label: 'Kruie ro Yietre', cx: 118.1, cy: 326.1 },
   ],
   ditania: [
     { label: 'Bermo',       cx: 342.0, cy: 451.9 },

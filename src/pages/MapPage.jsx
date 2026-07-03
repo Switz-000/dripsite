@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { pathToSlug, useFlags, useCountryGeo } from '../hooks/useVault'
+import { pathToSlug, useFlags, useCountryGeo, useWorldCities } from '../hooks/useVault'
 import { flagUrlFor } from '../utils/github'
 import { slugId } from '../utils/geo'
-import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, STATE_VIEWBOXES, CITIES } from '../data/mapData'
+import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, CITIES } from '../data/mapData'
 
 // Flag lookup for a map country — matched by article filename, then label
 function countryFlag(country, flags) {
@@ -23,6 +23,31 @@ function toSvgPoint(svg, clientX, clientY) {
   if (!ctm) return { x: 0, y: 0 }
   const svgPt = pt.matrixTransform(ctm.inverse())
   return { x: Math.round(svgPt.x * 10) / 10, y: Math.round(svgPt.y * 10) / 10 }
+}
+
+// Geometry-derived bounding box for a path's `d` string. Rendered into the
+// live <svg> just long enough to read getBBox(), so it's always in the map's
+// own coordinate system regardless of the current zoom. This is why we don't
+// hand-maintain per-state viewBoxes — the frame is computed from the shape.
+function pathBBox(svg, d) {
+  if (!svg || !d) return null
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  p.setAttribute('d', d)
+  p.setAttribute('fill', 'none')
+  svg.appendChild(p)
+  const box = p.getBBox()
+  svg.removeChild(p)
+  return box
+}
+
+// A viewBox string that frames `box` with a little breathing room around it.
+function bboxViewBox(box, padFrac = 0.12) {
+  const pad = Math.max(box.width, box.height) * padFrac
+  const x = box.x - pad
+  const y = box.y - pad
+  const w = box.width + pad * 2
+  const h = box.height + pad * 2
+  return `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
 }
 
 export default function MapPage() {
@@ -51,6 +76,9 @@ export default function MapPage() {
     activeCountry ? CITIES[activeCountry.id] : null,
   )
 
+  // Every country's cities, so the continent view can plot the big ones
+  const worldCities = useWorldCities()
+
   // State shapes render immediately from local data; ids derived from labels
   const stateShapes = ((activeCountry && STATES[activeCountry.id]) || [])
     .map(s => ({ id: slugId(s.label), label: s.label, path: s.path }))
@@ -69,7 +97,10 @@ export default function MapPage() {
     // no states — skip straight to city view
     setView((STATES[id] || []).length > 0 ? 'country' : 'cities')
 
-    if (COUNTRY_VIEWBOXES[id]) setViewBox(COUNTRY_VIEWBOXES[id])
+    // Frame the country: a hand-tuned viewBox if one exists, else derive it
+    // from the country's own shape.
+    const box = pathBBox(svgRef.current, country.path)
+    setViewBox(COUNTRY_VIEWBOXES[id] || (box ? bboxViewBox(box, 0.06) : '0 0 800 600'))
   }
 
   function handleStateClick(id) {
@@ -77,8 +108,11 @@ export default function MapPage() {
     if (!state) return
     setActiveState(state)
     setView('state')
-    const vb = STATE_VIEWBOXES[activeCountry?.id]?.[id]
-    if (vb) setViewBox(vb)
+    // Zoom to the state by computing its bounding box from its shape — no
+    // hand-entered coordinates to get wrong.
+    const box = pathBBox(svgRef.current, state.path)
+    if (box) setViewBox(bboxViewBox(box))
+    else if (activeCountry) setViewBox(COUNTRY_VIEWBOXES[activeCountry.id] || '0 0 800 600')
   }
 
   function goBack() {
@@ -104,6 +138,11 @@ export default function MapPage() {
         : ['major']
 
   function getVisibleCities() {
+    // Continent view: the biggest cities from every country
+    if (view === 'world') {
+      return worldCities.filter(c => (c.cx || c.cy) && visibleSizes.includes(c.size))
+    }
+
     if (!activeCountry || !geo) return []
     // skip cities whose coordinates haven't been set yet
     const drawable = geo.cities.filter(c => c.cx || c.cy)
@@ -118,11 +157,19 @@ export default function MapPage() {
 
   const visibleCities = getVisibleCities()
 
+  // Current zoom factor: viewBox width relative to the full continent (800).
+  const zoomScale = parseFloat(viewBox.split(' ')[2]) / 800
+
   function dotSize(size) {
-    const w = parseFloat(viewBox.split(' ')[2])
-    const scale = w / 800
     const base = { major: 10, medium: 8, minor: 6 }
-    return (base[size] || 3) * scale
+    return (base[size] || 3) * zoomScale
+  }
+
+  // City label size — three distinct tiers keyed to the city's size class,
+  // scaled to the zoom level so labels stay legible without dominating.
+  function labelSize(size) {
+    const base = { major: 12, medium: 9.5, minor: 7.5 }
+    return (base[size] || 7.5) * zoomScale
   }
 
   const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null
@@ -249,7 +296,7 @@ export default function MapPage() {
                       : 'var(--bg-surface)'
                 }
                 stroke="var(--border-strong)"
-                strokeWidth="1"
+                strokeWidth={zoomScale * 1.6}
                 style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
                 onMouseEnter={() => setHoveredId(c.id)}
                 onMouseLeave={() => setHoveredId(null)}
@@ -257,27 +304,33 @@ export default function MapPage() {
               />
             ))}
 
-            {/* State paths — only when inside a country with states */}
-            {view === 'country' && activeCountry && stateShapes.map(s => (
-              <path
-                key={s.id}
-                id={s.id}
-                d={s.path || ''}
-                fill={
-                  activeState?.id === s.id
+            {/* State paths — kept while inside a country AND while zoomed into
+                a state, so the internal borders stay visible during state zoom */}
+            {(view === 'country' || view === 'state') && activeCountry && stateShapes.map(s => {
+              const isActive = activeState?.id === s.id
+              const fill = view === 'state'
+                // zoomed in: gently tint the focused state, outline the rest
+                ? (isActive ? 'color-mix(in srgb, var(--text-accent) 15%, transparent)' : 'transparent')
+                : (isActive
                     ? 'var(--text-accent)'
                     : hoveredId === s.id
                       ? 'color-mix(in srgb, var(--text-accent) 40%, var(--bg-surface))'
-                      : 'transparent'
-                }
-                stroke="var(--border-strong)"
-                strokeWidth="0.5"
-                style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
-                onMouseEnter={() => setHoveredId(s.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => handleStateClick(s.id)}
-              />
-            ))}
+                      : 'transparent')
+              return (
+                <path
+                  key={s.id}
+                  id={s.id}
+                  d={s.path || ''}
+                  fill={fill}
+                  stroke="var(--border-strong)"
+                  strokeWidth={zoomScale * (isActive ? 1.4 : 1.1)}
+                  style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
+                  onMouseEnter={() => setHoveredId(s.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => handleStateClick(s.id)}
+                />
+              )
+            })}
 
             {/* City dots */}
             {visibleCities.map(city => {
@@ -305,21 +358,25 @@ export default function MapPage() {
                       stroke="var(--bg-surface)" strokeWidth={r * 0.4}
                     />
                   )}
-                  {(view === 'state' || view === 'cities' || city.size === 'major') && (
-                    <text
-                      x={city.cx + r + 1} y={city.cy + r * 0.5}
-                      fontSize={dotSize('major') * 1.6}
-                      fill="var(--text-primary)"
-                      fontFamily="var(--font-ui)"
-                      paintOrder="stroke"
-                      stroke="var(--bg-surface)"
-                      strokeWidth={dotSize('major') * 0.8}
-                      strokeLinejoin="round"
-                      style={{ pointerEvents: 'none', userSelect: 'none' }}
-                    >
-                      {city.label}
-                    </text>
-                  )}
+                  {(view === 'state' || view === 'cities' || city.size === 'major') && (() => {
+                    const fs = labelSize(city.size)
+                    return (
+                      <text
+                        x={city.cx + r + fs * 0.35} y={city.cy + fs * 0.32}
+                        fontSize={fs}
+                        fontWeight={city.size === 'major' ? 700 : 400}
+                        fill="var(--text-primary)"
+                        fontFamily="var(--font-display)"
+                        paintOrder="stroke"
+                        stroke="var(--bg-surface)"
+                        strokeWidth={fs * 0.24}
+                        strokeLinejoin="round"
+                        style={{ pointerEvents: 'none', userSelect: 'none' }}
+                      >
+                        {city.label}
+                      </text>
+                    )
+                  })()}
                 </g>
               )
             })}

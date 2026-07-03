@@ -23,6 +23,7 @@ import {
   latestPopulation,
   citySize,
 } from '../utils/geo'
+import { COUNTRIES, STATES, CITIES } from '../data/mapData'
 
 // Module-level caches — survive re-renders and re-mounts
 export const articleCache = new Map()
@@ -324,6 +325,42 @@ export function useCountryGeo(country, stateDefs, cityDefs) {
   }, [country, tree]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { geo, loading }
+}
+
+// ── All cities across the continent ───────────────────────────
+// For the world/continent view: enriches every country's city definitions
+// (population, size, capital, article slug) so the map can plot major cities
+// even before a country is selected. Loads each country's geo once and shares
+// the per-country cache with useCountryGeo, so drilling in costs no refetch.
+export function useWorldCities() {
+  const { tree } = useFileTree()
+  const [cities, setCities] = useState([])
+
+  useEffect(() => {
+    if (!tree) return
+    let alive = true
+
+    // Only countries that actually declare cities need loading.
+    const entries = COUNTRIES.filter(c => (CITIES[c.id] || []).length > 0)
+
+    Promise.all(entries.map(async c => {
+      let model = _countryGeoCache.get(c.id)
+      if (!model) {
+        model = await buildCountryGeo(c, STATES[c.id], CITIES[c.id], tree).catch(() => null)
+        if (model) _countryGeoCache.set(c.id, model)
+      }
+      return model
+    })).then(models => {
+      if (!alive) return
+      const all = []
+      for (const m of models) if (m) all.push(...m.cities)
+      setCities(all)
+    })
+
+    return () => { alive = false }
+  }, [tree])
+
+  return cities
 }
 
 // ── Lightweight frontmatter fetch ─────────────────────────────
