@@ -135,7 +135,7 @@ export const COUNTRIES = [
 
 // ── Zoom coordinates per country ──────────────────────────────
 // Vais preencher estes depois de ver o mapa no browser
-// São as coordenadas do viewBox quando se clica num país
+// São as coordenadas do viewBox quando se clica num país e
 export const COUNTRY_VIEWBOXES = {
   susia:        '33 61 252 382',
   confia:       '256 110 268 235',
