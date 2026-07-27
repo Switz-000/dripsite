@@ -207,6 +207,11 @@ export const CITIES = {
     { label: 'Hǎvesna', cx: 97.5, cy: 367.9 },
     { label: 'Razrij', cx: 78.3, cy: 396.9 },
     { label: 'Kruie ro Yietre', cx: 118.1, cy: 326.1 },
+    { label: 'Donetruže', cx: 224.2, cy: 325.7 },
+    { label: 'Ňeloy', cx: 148.7, cy: 194.4 },
+    { label: 'Soiteslaj', cx: 210.4, cy: 200.3 },
+    { label: 'Unarete', cx: 210.4, cy: 141.2 },
+    { label: 'Damčev', cx: 224, cy: 287.2 },
   ],
   ditania: [
     { label: 'Bermo',       cx: 342.0, cy: 451.9 },
