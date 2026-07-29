@@ -229,12 +229,17 @@ export const MAP_SIZING = {
     scale: 1,                              // master multiplier for all dots
     px: { major: 7, medium: 5.5, minor: 4 },
     capitalBoost: 1.15,                    // state-capital squares
-    nationalBoost: 1.6,                     // national-capital stars
+    nationalBoost: 1.45,                   // national-capital stars
+    // Halo that lifts a marker off the map, as a fraction of its radius. The
+    // star gets a much thinner one: the same stroke that reads as a hairline
+    // around a circle swallows a star's points.
+    outline: 0.32,
+    starOutline: 0.12,
   },
   label: {
     scale: 1,                              // master multiplier for all labels
     px: { major: 13, medium: 11, minor: 9.5 },
-    gap: 3,                                // clearance between dot and label
+    gap: 3.5,                              // clearance between marker and label
   },
   // Map outlines, also in screen pixels
   stroke: { country: 1.6, state: 1.1, stateActive: 1.4 },

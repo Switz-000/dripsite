@@ -4,7 +4,7 @@ import { pathToSlug, useFlags, useCountryGeo, useWorldCities } from '../hooks/us
 import { flagUrlFor } from '../utils/github'
 import { slugId } from '../utils/geo'
 import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, CITIES, MAP_SIZING } from '../data/mapData'
-import { makeLandTester, placeLabels, starPoints } from '../utils/mapLabels'
+import { makeLandTester, makeTextMeasurer, placeLabels, starPoints, LABEL_HALO } from '../utils/mapLabels'
 
 // Flag lookup for a map country — matched by article filename, then label
 function countryFlag(country, flags) {
@@ -231,6 +231,10 @@ export default function MapPage() {
     return px(base * sizing.label)
   }
 
+  // Bold names get measured as bold — otherwise their boxes come out too
+  // narrow and the next label creeps into them.
+  const isBold = city => !!city.capital || city.size === 'major'
+
   // Which cities carry a visible name at this zoom level
   const labelled = useMemo(
     () => visibleCities.filter(c => view === 'state' || view === 'cities' || c.size === 'major'),
@@ -240,18 +244,38 @@ export default function MapPage() {
   // Country outlines never change, so the point-in-land test is built once.
   const isLand = useMemo(() => makeLandTester(COUNTRIES), [])
 
+  // Labels are measured in the map's real font. Until the webfont arrives the
+  // browser measures the fallback, so re-measure (and re-place) once it loads.
+  const [fontsReady, setFontsReady] = useState(false)
+  useEffect(() => {
+    if (typeof document === 'undefined' || !document.fonts) return
+    let alive = true
+    document.fonts.ready.then(() => { if (alive) setFontsReady(true) })
+    return () => { alive = false }
+  }, [])
+
+  const measure = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const family =
+      getComputedStyle(document.documentElement).getPropertyValue('--font-display').trim() || 'serif'
+    return makeTextMeasurer(family)
+    // fontsReady busts the per-label measurement cache
+  }, [fontsReady])
+
   // Positions for every label: right of the dot by default, but moved left /
   // up / down (and out over the water near a coast) when that slot is taken.
   const labelLayout = useMemo(
     () => placeLabels(labelled, visibleCities.map(c => ({ x: c.cx, y: c.cy, r: dotSize(c) })), {
       fontSizeOf: labelSize,
       radiusOf: dotSize,
+      boldOf: isBold,
       gap: px(MAP_SIZING.label.gap),
       viewBox: vb,
       isLand,
+      measure,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labelled, visibleCities, viewBox, unitsPerPx, sizing.dot, sizing.label, isLand],
+    [labelled, visibleCities, viewBox, unitsPerPx, sizing.dot, sizing.label, isLand, measure],
   )
 
   const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null
@@ -456,7 +480,11 @@ export default function MapPage() {
               const r = dotSize(city)
               const isHovered = hoveredCity?.id === city.id
               const fill = isHovered ? 'var(--text-accent)' : 'var(--text-primary)'
-              const outline = { stroke: 'var(--bg-surface)', strokeWidth: r * 0.34 }
+              const isStar = city.capitalLevel === 'national'
+              const outline = {
+                stroke: 'var(--bg-surface)',
+                strokeWidth: r * (isStar ? MAP_SIZING.dot.starOutline : MAP_SIZING.dot.outline),
+              }
               return (
                 <g
                   key={city.id}
@@ -465,7 +493,7 @@ export default function MapPage() {
                   onMouseLeave={() => setHoveredCity(null)}
                   onClick={() => { if (city.slug) navigate(`/article/${city.slug}`) }}
                 >
-                  {city.capitalLevel === 'national' ? (
+                  {isStar ? (
                     <polygon
                       points={starPoints(city.cx, city.cy, r)}
                       fill={fill} strokeLinejoin="round" {...outline}
@@ -486,18 +514,18 @@ export default function MapPage() {
             {/* City labels — drawn after every marker so nothing sits on top of
                 them, and positioned by the collision-aware placer */}
             <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
-              {labelLayout.map(({ city, x, y, fontSize }) => (
+              {labelLayout.map(({ city, x, y, anchor, fontSize }) => (
                 <text
                   key={city.id}
                   x={x} y={y}
                   fontSize={fontSize}
-                  textAnchor="middle"
-                  fontWeight={city.capital || city.size === 'major' ? 700 : 400}
+                  textAnchor={anchor}
+                  fontWeight={isBold(city) ? 700 : 400}
                   fill="var(--text-primary)"
                   fontFamily="var(--font-display)"
                   paintOrder="stroke"
                   stroke="var(--bg-surface)"
-                  strokeWidth={fontSize * 0.24}
+                  strokeWidth={fontSize * LABEL_HALO * 2}
                   strokeLinejoin="round"
                 >
                   {city.label}
