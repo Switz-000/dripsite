@@ -138,22 +138,7 @@ export const COUNTRIES = [
 // São as coordenadas do viewBox quando se clica num país e
 export const COUNTRY_VIEWBOXES = {
   susia:        '33 61 252 382',
-  confia:       '256 110 268 235',
-  zaphonia:     '252 287 277 199',
-  kapiogg:      '328 38 379 197',
-  pierej:       '478 166 228 175',
-  kamino:       '492 271 254 217',
-  astofayan:    '50 367 158 136',
   ditania:      '294 426 98 78',
-  cabunire:     '353 424 96 92',
-  drippalia:    '249 78 148 77',
-  celiolaj:     '221 0 180 105',
-  garecija:     '178 471 123 92',
-  ariwaro:      '57 467 159 112',
-  chongzha:     '257 415 75 120',
-  balsheck:     '297 455 87 69',
-  yakiria:      '348 472 57 54',
-  macoshill:    '397 424 302 166',
   'sutsa-fuhu': '158 368 131 137',
 }
 
@@ -182,7 +167,6 @@ export const STATES = {
 // ── Cities ────────────────────────────────────────────────────
 // One line per city: { label, cx, cy }. Everything else (population,
 // size, state, capital, article link) is derived from the vault.
-// cx e cy são as coordenadas no mapa — vais buscar ao Illustrator
 export const CITIES = {
   susia: [
     { label: 'Duolij', cx: 159.5, cy: 217.4 },

@@ -158,17 +158,17 @@ export default function MapPage() {
   const visibleCities = getVisibleCities()
 
   // Current zoom factor: viewBox width relative to the full continent (800).
-  const zoomScale = parseFloat(viewBox.split(' ')[2]) / 800
+  const zoomScale = parseFloat(viewBox.split(' ')[2]) / 550
 
   function dotSize(size) {
-    const base = { major: 10, medium: 8, minor: 6 }
-    return (base[size] || 3) * zoomScale
+    const base = { major: 8, medium: 6, minor: 4 }
+    return (base[size] || 2) * zoomScale
   }
 
   // City label size — three distinct tiers keyed to the city's size class,
   // scaled to the zoom level so labels stay legible without dominating.
   function labelSize(size) {
-    const base = { major: 12, medium: 9.5, minor: 7.5 }
+    const base = { major: 10, medium: 8, minor: 6 }
     return (base[size] || 7.5) * zoomScale
   }
 
