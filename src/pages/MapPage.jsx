@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { pathToSlug, useFlags, useCountryGeo, useWorldCities } from '../hooks/useVault'
 import { flagUrlFor } from '../utils/github'
 import { slugId } from '../utils/geo'
-import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, CITIES } from '../data/mapData'
+import { COUNTRIES, COUNTRY_VIEWBOXES, STATES, CITIES, MAP_SIZING } from '../data/mapData'
+import { makeLandTester, placeLabels, starPoints } from '../utils/mapLabels'
 
 // Flag lookup for a map country — matched by article filename, then label
 function countryFlag(country, flags) {
@@ -40,6 +41,25 @@ function pathBBox(svg, d) {
   return box
 }
 
+// ── Live sizing overrides ─────────────────────────────────────
+// The two scale knobs (dots and labels, tuned independently) are kept in
+// localStorage so a tweak survives a reload. Defaults come from MAP_SIZING.
+const SIZING_KEY = 'dripwiki.map.sizing'
+
+function loadSizing() {
+  const fallback = { dot: MAP_SIZING.dot.scale, label: MAP_SIZING.label.scale }
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZING_KEY) || 'null')
+    if (!saved) return fallback
+    return {
+      dot: Number.isFinite(saved.dot) ? saved.dot : fallback.dot,
+      label: Number.isFinite(saved.label) ? saved.label : fallback.label,
+    }
+  } catch {
+    return fallback
+  }
+}
+
 // A viewBox string that frames `box` with a little breathing room around it.
 function bboxViewBox(box, padFrac = 0.12) {
   const pad = Math.max(box.width, box.height) * padFrac
@@ -67,6 +87,37 @@ export default function MapPage() {
   const [pickerMode, setPickerMode] = useState(false)
   const [pickedPoints, setPickedPoints] = useState([])
   const [liveCoord, setLiveCoord] = useState(null)
+
+  // ── Sizing (dots and labels scale separately) ─────────────────
+  const [sizingOpen, setSizingOpen] = useState(false)
+  const [sizing, setSizing] = useState(loadSizing)
+
+  function updateSizing(patch) {
+    setSizing(prev => {
+      const next = { ...prev, ...patch }
+      try { localStorage.setItem(SIZING_KEY, JSON.stringify(next)) } catch { /* private mode */ }
+      return next
+    })
+  }
+
+  // Rendered width of the <svg> in CSS pixels. Together with the viewBox width
+  // it gives the map's current scale, so marker/label sizes can be authored in
+  // screen pixels and stay identical whether you're looking at a tiny state or
+  // the whole continent.
+  const [svgPx, setSvgPx] = useState(0)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const measure = () => setSvgPx(el.getBoundingClientRect().width)
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure)
+      return () => window.removeEventListener('resize', measure)
+    }
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Frontmatter-driven geography (population, capitals, article links),
   // fetched in one burst per country and cached for the session
@@ -137,7 +188,9 @@ export default function MapPage() {
         ? ['major', 'medium']
         : ['major']
 
-  function getVisibleCities() {
+  // Memoised: label placement below runs over this list, and it must not be
+  // redone on every hover.
+  const visibleCities = useMemo(() => {
     // Continent view: the biggest cities from every country
     if (view === 'world') {
       return worldCities.filter(c => (c.cx || c.cy) && visibleSizes.includes(c.size))
@@ -153,24 +206,53 @@ export default function MapPage() {
 
     // for 'cities' view (no states) or 'country' view — show all cities in country
     return drawable.filter(c => visibleSizes.includes(c.size))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, worldCities, activeCountry, activeState, geo])
+
+  // Map units per CSS pixel at the current zoom. Everything drawn on top of the
+  // map (dots, labels, strokes) is authored in pixels and multiplied by this,
+  // so a big country and a small state render markers at the same size.
+  const vb = viewBox.split(' ').map(Number)
+  const unitsPerPx = svgPx > 0 ? vb[2] / svgPx : vb[2] / 800
+  const px = n => n * unitsPerPx
+
+  // Dot radius and label size are deliberately independent: each has its own
+  // per-tier pixel size and its own master scale (MAP_SIZING / ⚙ Sizing panel).
+  function dotSize(city) {
+    const base = MAP_SIZING.dot.px[city.size] ?? MAP_SIZING.dot.px.minor
+    const boost = city.capitalLevel === 'national'
+      ? MAP_SIZING.dot.nationalBoost
+      : city.capital ? MAP_SIZING.dot.capitalBoost : 1
+    return px(base * boost * sizing.dot)
   }
 
-  const visibleCities = getVisibleCities()
-
-  // Current zoom factor: viewBox width relative to the full continent (800).
-  const zoomScale = parseFloat(viewBox.split(' ')[2]) / 550
-
-  function dotSize(size) {
-    const base = { major: 8, medium: 6, minor: 4 }
-    return (base[size] || 2) * zoomScale
+  function labelSize(city) {
+    const base = MAP_SIZING.label.px[city.size] ?? MAP_SIZING.label.px.minor
+    return px(base * sizing.label)
   }
 
-  // City label size — three distinct tiers keyed to the city's size class,
-  // scaled to the zoom level so labels stay legible without dominating.
-  function labelSize(size) {
-    const base = { major: 10, medium: 8, minor: 6 }
-    return (base[size] || 7.5) * zoomScale
-  }
+  // Which cities carry a visible name at this zoom level
+  const labelled = useMemo(
+    () => visibleCities.filter(c => view === 'state' || view === 'cities' || c.size === 'major'),
+    [visibleCities, view],
+  )
+
+  // Country outlines never change, so the point-in-land test is built once.
+  const isLand = useMemo(() => makeLandTester(COUNTRIES), [])
+
+  // Positions for every label: right of the dot by default, but moved left /
+  // up / down (and out over the water near a coast) when that slot is taken.
+  const labelLayout = useMemo(
+    () => placeLabels(labelled, visibleCities.map(c => ({ x: c.cx, y: c.cy, r: dotSize(c) })), {
+      fontSizeOf: labelSize,
+      radiusOf: dotSize,
+      gap: px(MAP_SIZING.label.gap),
+      viewBox: vb,
+      isLand,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [labelled, visibleCities, viewBox, unitsPerPx, sizing.dot, sizing.label, isLand],
+  )
 
   const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null
   const tooltip = hoveredCity
@@ -203,9 +285,15 @@ export default function MapPage() {
           {view === 'state' && 'State — click a city'}
         </div>
         <button
+          onClick={() => setSizingOpen(s => !s)}
+          className={`filter-btn${sizingOpen ? ' active' : ''}`}
+          style={{ marginLeft: 'auto' }}
+        >
+          ⚙ Sizing
+        </button>
+        <button
           onClick={() => setPickerMode(p => !p)}
           className="filter-btn"
-          style={{ marginLeft: view === 'world' ? 'auto' : 0 }}
         >
           {pickerMode ? '✕ Exit Coordinate Picker' : '📍 Coordinate Picker'}
         </button>
@@ -215,6 +303,36 @@ export default function MapPage() {
           </button>
         )}
       </div>
+
+      {sizingOpen && (
+        <div style={{
+          marginBottom: 16, padding: '10px 12px', background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-strong)', fontFamily: 'var(--font-ui)',
+          fontSize: '0.72rem', color: 'var(--text-secondary)',
+          display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
+        }}>
+          <SizeSlider
+            label="Dot size"
+            value={sizing.dot}
+            onChange={v => updateSizing({ dot: v })}
+          />
+          <SizeSlider
+            label="Label size"
+            value={sizing.label}
+            onChange={v => updateSizing({ label: v })}
+          />
+          <button
+            className="filter-btn"
+            onClick={() => updateSizing({ dot: MAP_SIZING.dot.scale, label: MAP_SIZING.label.scale })}
+          >
+            Reset
+          </button>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+            Saved in this browser. To change it for everyone, set{' '}
+            <code>MAP_SIZING.dot.scale</code> / <code>.label.scale</code> in <code>mapData.js</code>.
+          </span>
+        </div>
+      )}
 
       {pickerMode && (
         <div style={{
@@ -296,7 +414,7 @@ export default function MapPage() {
                       : 'var(--bg-surface)'
                 }
                 stroke="var(--border-strong)"
-                strokeWidth={zoomScale * 1.6}
+                strokeWidth={px(MAP_SIZING.stroke.country)}
                 style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
                 onMouseEnter={() => setHoveredId(c.id)}
                 onMouseLeave={() => setHoveredId(null)}
@@ -323,7 +441,7 @@ export default function MapPage() {
                   d={s.path || ''}
                   fill={fill}
                   stroke="var(--border-strong)"
-                  strokeWidth={zoomScale * (isActive ? 1.4 : 1.1)}
+                  strokeWidth={px(isActive ? MAP_SIZING.stroke.stateActive : MAP_SIZING.stroke.state)}
                   style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
                   onMouseEnter={() => setHoveredId(s.id)}
                   onMouseLeave={() => setHoveredId(null)}
@@ -332,10 +450,13 @@ export default function MapPage() {
               )
             })}
 
-            {/* City dots */}
+            {/* City markers — star = national capital, square = state capital,
+                circle = ordinary city */}
             {visibleCities.map(city => {
-              const r = dotSize(city.size)
+              const r = dotSize(city)
               const isHovered = hoveredCity?.id === city.id
+              const fill = isHovered ? 'var(--text-accent)' : 'var(--text-primary)'
+              const outline = { stroke: 'var(--bg-surface)', strokeWidth: r * 0.34 }
               return (
                 <g
                   key={city.id}
@@ -344,52 +465,58 @@ export default function MapPage() {
                   onMouseLeave={() => setHoveredCity(null)}
                   onClick={() => { if (city.slug) navigate(`/article/${city.slug}`) }}
                 >
-                  {city.capital ? (
+                  {city.capitalLevel === 'national' ? (
+                    <polygon
+                      points={starPoints(city.cx, city.cy, r)}
+                      fill={fill} strokeLinejoin="round" {...outline}
+                    />
+                  ) : city.capital ? (
                     <rect
                       x={city.cx - r} y={city.cy - r}
                       width={r * 2} height={r * 2}
-                      fill={isHovered ? 'var(--text-accent)' : 'var(--text-primary)'}
-                      stroke="var(--bg-surface)" strokeWidth={r * 0.4}
+                      fill={fill} {...outline}
                     />
                   ) : (
-                    <circle
-                      cx={city.cx} cy={city.cy} r={r}
-                      fill={isHovered ? 'var(--text-accent)' : 'var(--text-primary)'}
-                      stroke="var(--bg-surface)" strokeWidth={r * 0.4}
-                    />
+                    <circle cx={city.cx} cy={city.cy} r={r} fill={fill} {...outline} />
                   )}
-                  {(view === 'state' || view === 'cities' || city.size === 'major') && (() => {
-                    const fs = labelSize(city.size)
-                    return (
-                      <text
-                        x={city.cx + r + fs * 0.35} y={city.cy + fs * 0.32}
-                        fontSize={fs}
-                        fontWeight={city.size === 'major' ? 700 : 400}
-                        fill="var(--text-primary)"
-                        fontFamily="var(--font-display)"
-                        paintOrder="stroke"
-                        stroke="var(--bg-surface)"
-                        strokeWidth={fs * 0.24}
-                        strokeLinejoin="round"
-                        style={{ pointerEvents: 'none', userSelect: 'none' }}
-                      >
-                        {city.label}
-                      </text>
-                    )
-                  })()}
                 </g>
               )
             })}
 
+            {/* City labels — drawn after every marker so nothing sits on top of
+                them, and positioned by the collision-aware placer */}
+            <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
+              {labelLayout.map(({ city, x, y, fontSize }) => (
+                <text
+                  key={city.id}
+                  x={x} y={y}
+                  fontSize={fontSize}
+                  textAnchor="middle"
+                  fontWeight={city.capital || city.size === 'major' ? 700 : 400}
+                  fill="var(--text-primary)"
+                  fontFamily="var(--font-display)"
+                  paintOrder="stroke"
+                  stroke="var(--bg-surface)"
+                  strokeWidth={fontSize * 0.24}
+                  strokeLinejoin="round"
+                >
+                  {city.label}
+                </text>
+              ))}
+            </g>
+
             {/* Picked-point markers (coordinate picker) */}
-            {pickerMode && pickedPoints.map((p, i) => (
-              <g key={i} style={{ pointerEvents: 'none' }}>
-                <circle cx={p.x} cy={p.y} r={dotSize('major') * 0.6} fill="none" stroke="#e63946" strokeWidth={dotSize('major') * 0.15} />
-                <line x1={p.x - dotSize('major')} y1={p.y} x2={p.x + dotSize('major')} y2={p.y} stroke="#e63946" strokeWidth={dotSize('major') * 0.1} />
-                <line x1={p.x} y1={p.y - dotSize('major')} x2={p.x} y2={p.y + dotSize('major')} stroke="#e63946" strokeWidth={dotSize('major') * 0.1} />
-                <text x={p.x + dotSize('major') + 2} y={p.y} fontSize={dotSize('major')} fill="#e63946" fontFamily="var(--font-ui)">{i + 1}</text>
-              </g>
-            ))}
+            {pickerMode && pickedPoints.map((p, i) => {
+              const m = px(9)   // crosshair arm length, in screen pixels
+              return (
+                <g key={i} style={{ pointerEvents: 'none' }}>
+                  <circle cx={p.x} cy={p.y} r={m * 0.6} fill="none" stroke="#e63946" strokeWidth={m * 0.15} />
+                  <line x1={p.x - m} y1={p.y} x2={p.x + m} y2={p.y} stroke="#e63946" strokeWidth={m * 0.1} />
+                  <line x1={p.x} y1={p.y - m} x2={p.x} y2={p.y + m} stroke="#e63946" strokeWidth={m * 0.1} />
+                  <text x={p.x + m * 1.2} y={p.y} fontSize={m} fill="#e63946" fontFamily="var(--font-ui)">{i + 1}</text>
+                </g>
+              )
+            })}
           </svg>
 
           {/* Live coordinate readout while picking */}
@@ -438,11 +565,17 @@ export default function MapPage() {
             display: 'flex', flexDirection: 'column', gap: 4
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="10" height="10"><rect x="1" y="1" width="8" height="8" fill="var(--text-primary)" /></svg>
-              Capital
+              <svg width="12" height="12">
+                <polygon points={starPoints(6, 6, 5.5)} fill="var(--text-primary)" />
+              </svg>
+              National capital
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="var(--text-primary)" /></svg>
+              <svg width="12" height="12"><rect x="2" y="2" width="8" height="8" fill="var(--text-primary)" /></svg>
+              State capital
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="var(--text-primary)" /></svg>
               City
             </div>
           </div>
@@ -470,6 +603,26 @@ export default function MapPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// One scale knob. Dots and labels each get their own, so they can be tuned
+// against each other instead of growing and shrinking together.
+function SizeSlider({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ minWidth: 68 }}>{label}</span>
+      <input
+        type="range"
+        min="0.3" max="3" step="0.05"
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 130, accentColor: 'var(--text-accent)' }}
+      />
+      <span style={{ minWidth: 30, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+        {value.toFixed(2)}
+      </span>
+    </label>
   )
 }
 
@@ -609,7 +762,11 @@ function CityRow({ city, navigate }) {
   return (
     <PanelRow clickable={!!city.slug} onClick={() => { if (city.slug) navigate(`/article/${city.slug}`) }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {city.capital && <span style={{ fontSize: '0.6rem', color: 'var(--text-accent)' }}>■</span>}
+        {city.capital && (
+          <span style={{ fontSize: '0.6rem', color: 'var(--text-accent)' }}>
+            {city.capitalLevel === 'national' ? '★' : '■'}
+          </span>
+        )}
         <span style={{ fontWeight: city.capital ? 700 : 400 }}>{city.label}</span>
       </div>
       {city.pop != null && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Pop. {city.pop.toLocaleString()}</div>}

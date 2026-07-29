@@ -279,6 +279,10 @@ async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
     const stateName = meta ? stripWL(meta.state) : ''
     const stateId = stateName ? slugId(stateName) : null
     const labelLower = c.label.toLowerCase()
+    // A capital is either the seat of its state or of the whole country;
+    // national wins when a city is both, so the map can star it.
+    const isNational = !!countryCapital && countryCapital === labelLower
+    const isStateSeat = stateId != null && capitalByStateId.get(stateId) === labelLower
     return {
       id: slugId(c.label),
       label: c.label,
@@ -287,9 +291,8 @@ async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
       stateId,
       pop,
       size: citySize(pop),
-      capital:
-        (stateId != null && capitalByStateId.get(stateId) === labelLower) ||
-        (!!countryCapital && countryCapital === labelLower),
+      capital: isNational || isStateSeat,
+      capitalLevel: isNational ? 'national' : isStateSeat ? 'state' : null,
       slug: articlePath ? pathToSlug(articlePath) : null,
     }
   })
