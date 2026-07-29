@@ -213,3 +213,29 @@ export const CITY_VISIBILITY = {
   country: ['major', 'medium'],
   state:   ['major', 'medium', 'minor'],
 }
+
+// ── Marker + label sizing ─────────────────────────────────────
+// Every number below is in SCREEN PIXELS, not map units. The map converts
+// them with the SVG's live scale, so a dot on a huge country renders at the
+// same size as one on a tiny state — big/small territories no longer make
+// markers and text blow up or disappear.
+//
+// `dot` and `label` are tuned INDEPENDENTLY: change `label.scale` to make all
+// text bigger without touching the dots, and vice versa. The ⚙ Sizing panel on
+// the map edits the two `scale` values live (saved in the browser); the values
+// here are the defaults everyone else sees, so copy a scale you like into it.
+export const MAP_SIZING = {
+  dot: {
+    scale: 1,                              // master multiplier for all dots
+    px: { major: 7, medium: 5.5, minor: 4 },
+    capitalBoost: 1.15,                    // state-capital squares
+    nationalBoost: 1.6,                     // national-capital stars
+  },
+  label: {
+    scale: 1,                              // master multiplier for all labels
+    px: { major: 13, medium: 11, minor: 9.5 },
+    gap: 3,                                // clearance between dot and label
+  },
+  // Map outlines, also in screen pixels
+  stroke: { country: 1.6, state: 1.1, stateActive: 1.4 },
+}
