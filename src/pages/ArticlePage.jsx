@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { useParams, Link, useLocation } from 'react-router-dom'
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useArticle, useFileTree, useFlags } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
-import { wikilinkToSlug, flagUrlFor } from '../utils/github'
+import { wikilinkToSlug, flagUrlFor, pathToSlug } from '../utils/github'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import PersonInfobox from '../components/PersonInfobox'
@@ -17,6 +17,8 @@ export default function ArticlePage() {
   const { article, loading, error } = useArticle(slug)
   const { tree } = useFileTree()
   const flags = useFlags()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const bodyRef = useRef(null)
   const [popup, setPopup] = useState({ visible: false, x: 0, y: 0, data: null, slug: null })
@@ -76,6 +78,17 @@ export default function ArticlePage() {
     }
     return () => { document.title = SITE.name }
   }, [article])
+
+  // Old base64 links and hand-typed names resolve too. Once the article is
+  // found, swap the address bar to its canonical slug so every article has
+  // exactly one URL. `replace` keeps the old URL out of the back button.
+  useEffect(() => {
+    if (!article) return
+    const canonical = pathToSlug(article.path)
+    if (slug !== canonical) {
+      navigate(`/article/${canonical}${location.hash}`, { replace: true })
+    }
+  }, [article, slug])
 
   function getBreadcrumb(path) {
     if (!path) return []

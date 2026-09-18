@@ -13,35 +13,16 @@ function renderTitle(title) {
   )
 }
 
-// Convert a vault path (as written in config) to the correct base64 slug
-function vaultPathToSlug(vaultPath) {
-  // Config paths use __ as separator for readability; convert back to /
-  const normalized = vaultPath.replace(/__/g, '/')
-  // pathToSlug expects a .md path, but config omits .md — that's fine,
-  // slugToPath will match by decoded path anyway
-  const clean = normalized.replace(/\.md$/, '')
-  return btoa(unescape(encodeURIComponent(clean)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
 export default function HomePage() {
   const { tree, loading } = useFileTree()
   const articleCount = tree ? tree.length : 0
 
-  // Build featured slugs once tree is loaded, matching by title fragment
-  const featuredWithSlugs = FEATURED_ARTICLES.map(f => {
-    if (!tree) return { ...f, resolvedSlug: vaultPathToSlug(f.slug) }
-    // Try to find the actual file in the tree so the slug is exact
-    const normalized = f.slug.replace(/__/g, '/').toLowerCase()
-    const match = tree.find(file => {
-      const fp = file.path.replace(/\.md$/, '').toLowerCase()
-      return fp === normalized || fp.endsWith('/' + normalized.split('/').pop())
-    })
-    return {
-      ...f,
-      resolvedSlug: match ? pathToSlug(match.path) : vaultPathToSlug(f.slug),
-    }
-  })
+  // The slug comes from the filename alone, so there's no need to wait for
+  // the tree. Config paths use __ in place of / (see config.js).
+  const featuredWithSlugs = FEATURED_ARTICLES.map(f => ({
+    ...f,
+    resolvedSlug: pathToSlug(f.slug.replace(/__/g, '/')),
+  }))
 
   return (
     <div className="page-inner">
