@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { LANDING, SITE } from '../config'
-import { REPO_CONFIG, rawFileUrl } from '../utils/github'
+import { REPO_CONFIG } from '../utils/github'
+import { useLicense } from '../hooks/useVault'
 
 // The out-of-universe front door. It sits outside <Layout> on purpose, so
 // none of the in-universe framing (sidebar, Troli Ustaras masthead) shows
@@ -10,24 +11,11 @@ import { REPO_CONFIG, rawFileUrl } from '../utils/github'
 const LICENSE_PAGE =
   `https://github.com/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/blob/${REPO_CONFIG.branch}/LICENSE`
 
-// Reads LICENSE straight from dripwiki.
-// undefined = still loading, null = not found, string = the text
-function useLicenseText() {
-  const [text, setText] = useState(undefined)
-  useEffect(() => {
-    fetch(rawFileUrl('LICENSE'))
-      .then(res => (res.ok ? res.text() : null))
-      .then(setText)
-      .catch(() => setText(null))
-  }, [])
-  return text
-}
-
 // Highlights unfinished placeholder text from config.js
 const todo = text => (text.startsWith('TODO') ? 'landing-todo' : undefined)
 
 export default function LandingPage() {
-  const license = useLicenseText()
+  const license = useLicense()
 
   useEffect(() => {
     document.title = LANDING.pageTitle

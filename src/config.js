@@ -13,7 +13,23 @@ export const SITE = {
   masthead:    'Freely provided by Troli Ustaras, in the spirit of open knowledge',
   // Shown at the bottom of the sidebar
   footer:      'Content on this encyclopedia is freely available under the YM TU-(C4) license.',
+  // Public address, used for the sitemap and canonical links
+  url:         'https://dripsite.vercel.app',
 }
+
+// ── Crawlers (robots.txt) ─────────────────────────────────────
+// robots.txt is generated at build time by scripts/prerender.mjs.
+// These AI training crawlers are told to stay out, in line with the
+// LICENSE's text and data mining reservation. Search engines, and
+// fetchers acting on a person's request, are still allowed.
+export const BLOCKED_CRAWLERS = [
+  'GPTBot',             // OpenAI, model training
+  'ClaudeBot',          // Anthropic, model training
+  'Google-Extended',    // Google, Gemini training (does not affect Google Search)
+  'CCBot',              // Common Crawl, an open web archive many labs train on
+  'Applebot-Extended',  // Apple, model training
+  'meta-externalagent', // Meta, model training
+]
 
 // ── Home page hero text ──────────────────────────────────────
 export const HOME = {
@@ -30,6 +46,9 @@ export const HOME = {
 // page, so unfinished spots are easy to see.
 export const LANDING = {
   pageTitle: 'The Dripstao Project',          // browser tab title
+  // Shown under the title in search results. Left out of the page while it
+  // still starts with TODO, so a placeholder never reaches Google.
+  description: 'TODO: one or two sentences for search results',
   title:     'Dripstao',
   byline:    'TODO: one line under the title',
   cta:       'Enter the wiki',    // button that goes to /wiki

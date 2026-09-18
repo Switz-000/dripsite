@@ -1,3 +1,7 @@
 node_modules
 .env
 dist
+# vault downloaded at build time by scripts/vault.mjs
+.vault
+# server-side build made by scripts/prerender.mjs
+.ssr

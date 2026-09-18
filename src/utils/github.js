@@ -1,4 +1,4 @@
-import { pathToSlug, slugToPath } from './slugs'
+import { pathToSlug, slugToPath } from './slugs.js'
 
 // ============================================================
 // REPO CONFIGURATION
@@ -9,7 +9,20 @@ export const REPO_CONFIG = {
   branch:     'main',
   rootPath:   '',
   imagesPath: '00 - Meta/Images',
-  token:      import.meta.env.VITE_GITHUB_TOKEN || null,
+  // import.meta.env only exists inside Vite; the ?. keeps this file
+  // importable from the plain-Node build scripts in scripts/
+  token:      import.meta.env?.VITE_GITHUB_TOKEN || null,
+}
+
+// Which vault files count as articles. Shared by the browser (the file
+// tree below) and the build scripts, so both see the same set.
+export function isArticlePath(path) {
+  return (
+    path.endsWith('.md') &&
+    !path.startsWith('.obsidian') &&
+    !path.includes('/.obsidian/') &&
+    !path.startsWith('00 - Meta/')
+  )
 }
 
 const BASE = `https://api.github.com/repos/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}`
@@ -54,7 +67,7 @@ let _rawTreePending = null
 
 export const FLAGS_PATH = `${REPO_CONFIG.imagesPath}/Country Flags`
 
-function buildFlagMap(rawTree) {
+export function buildFlagMap(rawTree) {
   const map = new Map()
   for (const f of rawTree) {
     if (f.type !== 'blob') continue
@@ -77,13 +90,7 @@ async function loadTrees() {
       })
       .then(data => {
         _flagMapCache = buildFlagMap(data.tree)
-        _treeCache = data.tree.filter(f =>
-          f.type === 'blob' &&
-          f.path.endsWith('.md') &&
-          !f.path.startsWith('.obsidian') &&
-          !f.path.includes('/.obsidian/') &&
-          !f.path.startsWith('00 - Meta/')
-        )
+        _treeCache = data.tree.filter(f => f.type === 'blob' && isArticlePath(f.path))
       })
       .catch(e => {
         _rawTreePending = null
