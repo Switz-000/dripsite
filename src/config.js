@@ -60,6 +60,12 @@ export const LANDING = {
       ],
     },
     {
+      heading: 'Our philosophy',
+      paragraphs: [
+        'We believe that history is created through mechanisms. There should never be hand-picked results. There is no grand narrative where the world serves the characters. Every institution has scars, every idea has a history, and every absurd tragedy is produced by a thousand rational choices of men who will never live to see it.',
+      ],
+    },
+    {
       heading: 'How to read the wiki',
       paragraphs: [
         'TODO: the wiki is written from inside the world. Say so here, so nobody takes the articles for real history.',
