@@ -30,7 +30,7 @@ export default function Layout() {
 
       <aside className={'sidebar ' + (sidebarOpen ? 'open' : '')}>
         <div className="sidebar-logo">
-          <Link to="/">
+          <Link to="/wiki">
             <div className="wordmark">{SITE.name}</div>
             <div className="subtitle">{SITE.tagline}</div>
           </Link>
@@ -50,7 +50,7 @@ export default function Layout() {
         <nav className="sidebar-nav">
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-label">Navigation</div>
-            <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Overview</NavLink>
+            <NavLink to="/wiki" end className={({ isActive }) => isActive ? 'active' : ''}>Overview</NavLink>
             <NavLink to="/browse" className={({ isActive }) => isActive ? 'active' : ''}>Browse All</NavLink>
             <NavLink to="/search" className={({ isActive }) => isActive ? 'active' : ''}>Search</NavLink>
           </div>
@@ -72,7 +72,8 @@ export default function Layout() {
 
         <div className="sidebar-footer">
           {articleCount} articles<br />
-          {SITE.footer}
+          {SITE.footer}<br />
+          <Link to="/" className="sidebar-about">About this project</Link>
         </div>
       </aside>
 

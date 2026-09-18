@@ -7,12 +7,18 @@ import BrowsePage from './pages/BrowsePage'
 import SearchPage from './pages/SearchPage'
 import NotFoundPage from './pages/NotFoundPage'
 import MapPage from './pages/MapPage'
+import LandingPage from './pages/LandingPage'
 
 export default function App() {
   return (
     <Routes>  
-      <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
+      {/* Out-of-universe landing page, outside the wiki's in-universe Layout */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Everything in-universe. A pathless route, so it adds the Layout
+          without adding anything to the URL. */}
+      <Route element={<Layout />}>
+        <Route path="wiki" element={<HomePage />} />
         {/* Use * so base64 slugs with any char are captured cleanly */}
         <Route path="article/*" element={<ArticlePage />} />
         <Route path="browse" element={<BrowsePage />} />
