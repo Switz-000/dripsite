@@ -23,6 +23,53 @@ export const HOME = {
   subtitle:  'A comprehensive reference for the Dripstan continenent, its history, institutions, corporations, and people.',
 }
 
+// ── Landing page (out of universe) ───────────────────────────
+// The page at /, outside the wiki's in-universe frame. It explains the
+// project to someone who has never heard of it; the wiki's own home page
+// is now at /wiki. Any text starting with "TODO" is highlighted on the
+// page, so unfinished spots are easy to see.
+export const LANDING = {
+  pageTitle: 'The Dripstao Project',          // browser tab title
+  title:     'Dripstao',
+  byline:    'TODO: one line under the title',
+  cta:       'Enter the wiki',    // button that goes to /wiki
+  sections: [
+    {
+      heading: 'What is Dripstao?',
+      paragraphs: [
+        'TODO: what Dripstao is, for someone who has never heard of it.',
+      ],
+    },
+    {
+      heading: 'How to read the wiki',
+      paragraphs: [
+        'TODO: the wiki is written from inside the world. Say so here, so nobody takes the articles for real history.',
+      ],
+    },
+    {
+      heading: 'Where to start',
+      paragraphs: [
+        'TODO: a sentence pointing new readers somewhere.',
+      ],
+      // Optional list of links under the paragraphs
+      links: [
+        { label: 'Susia',               to: '/article/susia' },
+        { label: 'The map',             to: '/map' },
+        { label: 'Browse all articles', to: '/browse' },
+      ],
+    },
+    {
+      heading: 'Who makes it',
+      paragraphs: [
+        'TODO: the authors, and how the project started.',
+      ],
+    },
+  ],
+  // The license text itself is read from the LICENSE file in dripwiki,
+  // so the site never keeps a second copy that could drift out of sync.
+  licenseHeading: 'License',
+}
+
 // ── Stats shown on home page ─────────────────────────────────
 // articleCount is filled automatically; the others you set manually
 export const HOME_STATS = [

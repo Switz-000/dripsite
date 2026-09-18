@@ -10,7 +10,7 @@ export default function NotFoundPage() {
         <p style={{ color: 'var(--text-secondary)', marginTop: 16, marginBottom: 32 }}>
           This article does not exist in the archive, or the link may be broken.
         </p>
-        <Link to="/" style={{ color: 'var(--link)' }}>← Return to overview</Link>
+        <Link to="/wiki" style={{ color: 'var(--link)' }}>← Return to overview</Link>
       </div>
     </div>
   )

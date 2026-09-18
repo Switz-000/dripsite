@@ -1052,3 +1052,91 @@ a:visited { color: var(--link-visited); }
 @media (max-width: 600px) {
   .ibx-person { float: none; width: 100%; margin: 0 0 20px 0; }
 }
+
+/* ============================================================
+   LANDING PAGE (out of universe, at /)
+   ============================================================ */
+.landing {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 88px 24px 96px;
+}
+.landing-hero {
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.landing-hero h1 {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.landing-byline {
+  margin-top: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+.landing-cta {
+  display: inline-block;
+  margin-top: 28px;
+  padding: 10px 22px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+}
+.landing-cta:hover {
+  background: var(--text-primary);
+  color: var(--bg);
+  text-decoration: none;
+}
+.landing-section { padding-top: 36px; }
+.landing-section h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin-bottom: 10px;
+}
+.landing-section p + p { margin-top: 12px; }
+.landing-links {
+  list-style: none;
+  margin-top: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+.landing-links li + li { margin-top: 4px; }
+.landing-links li::before { content: '\2192\00a0'; color: var(--text-muted); }
+.landing-license {
+  padding: 16px 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.landing-license-link {
+  margin-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+.landing-todo {
+  padding: 6px 10px;
+  border: 1px dashed var(--text-accent);
+  color: var(--text-accent);
+  font-style: italic;
+}
+.sidebar-about { font-weight: 500; }
+
+@media (max-width: 600px) {
+  .landing { padding: 48px 16px 64px; }
+  .landing-hero h1 { font-size: 2.3rem; }
+}
