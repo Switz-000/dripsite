@@ -1,3 +1,5 @@
+import { pathToSlug, slugToPath } from './slugs'
+
 // ============================================================
 // REPO CONFIGURATION
 // ============================================================
@@ -38,28 +40,10 @@ function authHeaders() {
   return h
 }
 
-// ── Slug encoding ─────────────────────────────────────────────
-// We use URL-safe base64 to encode vault paths into clean URL slugs.
-// This avoids all issues with spaces, special chars, and URL encoding.
-// e.g. "01 - Susia/06 - Characters/Armadesh Versij"
-//   -> "MDEgLSBTdXNpYS8wNiAtIENoYXJhY3RlcnMvQXJtYWRlc2ggVmVyc2lq"
-
-export function pathToSlug(path) {
-  // Remove .md extension, then base64 encode
-  const clean = path.replace(/\.md$/, '')
-  return btoa(unescape(encodeURIComponent(clean)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-export function slugToVaultPath(slug) {
-  try {
-    const padded = slug.replace(/-/g, '+').replace(/_/g, '/')
-    const pad = padded.length % 4 ? padded + '===='.slice(padded.length % 4) : padded
-    return decodeURIComponent(escape(atob(pad)))
-  } catch {
-    return null
-  }
-}
+// ── Slugs ─────────────────────────────────────────────────────
+// Slug logic lives in ./slugs.js (no browser or Vite dependencies, so the
+// prerender script can use it). Re-exported here so existing imports work.
+export { pathToSlug, slugToPath }
 
 // ── File tree ─────────────────────────────────────────────────
 // One recursive tree fetch feeds both the markdown file tree and the
@@ -136,26 +120,6 @@ export async function fetchMarkdown(path) {
   const res = await fetch(url, { headers: authHeaders() })
   if (!res.ok) throw new Error(`Could not load "${path}" (${res.status})`)
   return res.text()
-}
-
-// ── Path lookup ───────────────────────────────────────────────
-export function slugToPath(slug, tree) {
-  // First try decoding as base64 slug
-  const decoded = slugToVaultPath(slug)
-  if (decoded) {
-    // Try exact match (with and without .md)
-    const exact = tree.find(f =>
-      f.path === decoded + '.md' || f.path === decoded
-    )
-    if (exact) return exact.path
-  }
-
-  // Fallback: try treating slug as a filename fragment (legacy support)
-  const lower = slug.toLowerCase()
-  const fuzzy = tree.find(f =>
-    f.path.replace(/\.md$/, '').split('/').pop().toLowerCase() === lower
-  )
-  return fuzzy ? fuzzy.path : null
 }
 
 // ── Wikilink resolution ───────────────────────────────────────

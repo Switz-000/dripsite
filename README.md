@@ -1,4 +1,4 @@
-# Dripwiki
+# Dripsite
 
 A Wikipedia-style encyclopedia site that reads directly from the [dripwiki](https://github.com/Switz-000/dripwiki) Obsidian vault on GitHub.
 
@@ -10,24 +10,6 @@ A Wikipedia-style encyclopedia site that reads directly from the [dripwiki](http
 - Resolves `[[wikilinks]]` → internal navigation links
 - Strips Obsidian-specific syntax (dataview blocks, `%%` comments)
 - Full-text search via Fuse.js (title + path, no pre-indexing needed)
-
-## Local development
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173`
-
-## Deploy to Vercel
-
-1. Push this folder to a GitHub repo
-2. Go to [vercel.com](https://vercel.com) → New Project → import that repo
-3. Framework preset: **Vite**
-4. Click Deploy — that's it
-
-The `vercel.json` handles SPA routing automatically.
 
 ## Configuration
 
