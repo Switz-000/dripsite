@@ -5,6 +5,7 @@ import {
   fetchMarkdown,
   pathToSlug,
   slugToPath,
+  rawFileUrl,
   wikilinkToSlug as resolveWikilink,
 } from '../utils/github'
 import {
@@ -30,6 +31,7 @@ export const articleCache = new Map()
 export const metaCache = new Map()   // path -> frontmatter meta (lightweight)
 let treeCache = null
 let treePending = null   // in-flight promise, deduplicated
+let treeFromBuild = false  // true while treeCache is the copy baked into the page
 
 export function useFileTree() {
   const [tree, setTree] = useState(treeCache)
@@ -37,37 +39,93 @@ export function useFileTree() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (treeCache) {
+    // Already have the live tree from GitHub
+    if (treeCache && !treeFromBuild) {
       setTree(treeCache)
       setLoading(false)
       return
     }
 
-    // Deduplicate simultaneous calls
+    // Nothing yet, or only the build-time copy (which is already on screen,
+    // so this just refreshes it in the background). Deduplicated across
+    // every component that asks at the same time.
     if (!treePending) {
       treePending = getFileTree()
+        .then(t => {
+          // Keep the old array when nothing changed, so pages don't redo work
+          if (!(treeCache && samePaths(treeCache, t))) treeCache = t
+          treeFromBuild = false
+          return treeCache
+        })
+        .finally(() => { treePending = null })
     }
 
+    let alive = true
     treePending
       .then(t => {
-        treeCache = t
-        treePending = null
+        if (!alive) return
         setTree(t)
         setLoading(false)
       })
       .catch(e => {
-        treePending = null
-        setError(e.message)
+        if (!alive) return
+        // If GitHub fails but the page came with a tree, keep using that
+        if (!treeCache) setError(e.message)
         setLoading(false)
       })
+    return () => { alive = false }
   }, [])
 
   return { tree, loading, error }
 }
 
+function samePaths(a, b) {
+  return a.length === b.length && a.every((f, i) => f.path === b[i].path)
+}
+
+// Turns a vault file into the article object the pages render. Used for
+// live fetches here, and by the prerender at build time, so both produce
+// exactly the same thing.
+export function buildArticle(slug, path, raw, tree) {
+  const wikilinkFn = (text) => resolveWikilink(text, tree)
+  const { meta, html } = renderMarkdown(raw, tree, wikilinkFn)
+  const { body } = parseFrontmatter(raw)
+  return {
+    slug,
+    path,
+    title: getTitle(meta, path),
+    meta,
+    html,
+    summary: extractSummary(body),
+  }
+}
+
+// Build-time articles get one background check against GitHub per visit.
+// Keyed by slug so repeated effect runs share the same request.
+const refreshes = new Map()
+
+function refreshArticle(built, tree) {
+  if (!refreshes.has(built.slug)) {
+    const p = fetchMarkdown(built.path)
+      .then(raw => {
+        const live = buildArticle(built.slug, built.path, raw, tree)
+        articleCache.set(built.slug, live)
+        const changed = live.html !== built.html ||
+          JSON.stringify(live.meta) !== JSON.stringify(built.meta)
+        return changed ? live : null
+      })
+      .catch(() => null)   // keep showing the build-time copy
+    refreshes.set(built.slug, p)
+  }
+  return refreshes.get(built.slug)
+}
+
 export function useArticle(slug) {
-  const [article, setArticle] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // An article baked into the page at build time is already in the cache,
+  // so it renders on the very first pass, with no spinner
+  const cached = slug ? articleCache.get(slug) : undefined
+  const [article, setArticle] = useState(cached || null)
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState(null)
   const { tree, loading: treeLoading, error: treeError } = useFileTree()
 
@@ -84,8 +142,17 @@ export function useArticle(slug) {
 
     // Return from cache instantly
     if (articleCache.has(slug)) {
-      setArticle(articleCache.get(slug))
+      const hit = articleCache.get(slug)
+      setArticle(hit)
       setLoading(false)
+
+      // A build-time copy may be older than the vault: check GitHub in the
+      // background and swap in the live version only if it changed
+      if (hit.fromBuild) {
+        let alive = true
+        refreshArticle(hit, tree).then(live => { if (alive && live) setArticle(live) })
+        return () => { alive = false }
+      }
       return
     }
 
@@ -101,17 +168,7 @@ export function useArticle(slug) {
 
     fetchMarkdown(path)
       .then(raw => {
-        const wikilinkFn = (text) => resolveWikilink(text, tree)
-        const { meta, html } = renderMarkdown(raw, tree, wikilinkFn)
-        const { body } = parseFrontmatter(raw)
-        const result = {
-          slug,
-          path,
-          title: getTitle(meta, path),
-          meta,
-          html,
-          summary: extractSummary(body),
-        }
+        const result = buildArticle(slug, path, raw, tree)
         articleCache.set(slug, result)
         setArticle(result)
         setLoading(false)
@@ -384,6 +441,41 @@ export async function fetchMeta(path) {
   const { meta } = parseFrontmatter(raw)
   metaCache.set(path, meta)
   return meta
+}
+
+// ── License text (landing page) ───────────────────────────────
+// Read straight from the LICENSE file in dripwiki, so the site never
+// keeps a second copy. undefined = not loaded yet, null = no LICENSE file.
+let licenseCache
+
+export function useLicense() {
+  const [text, setText] = useState(licenseCache)
+
+  useEffect(() => {
+    if (licenseCache !== undefined) return
+    fetch(rawFileUrl('LICENSE'))
+      .then(res => (res.ok ? res.text() : null))
+      .then(t => { licenseCache = t; setText(t) })
+      .catch(() => setText(null))
+  }, [])
+
+  return text
+}
+
+// ── Build-time data ───────────────────────────────────────────
+// Fills the caches above with data baked into a prerendered page (see
+// scripts/prerender.mjs), so the hooks render it on the very first pass
+// instead of showing a spinner and fetching it again. Called by main.jsx in
+// the browser, and by the prerender in Node before it renders each page.
+// Anything baked in is still refreshed from GitHub in the background.
+export function primeVault({ tree, flags, article, license } = {}) {
+  if (tree) {
+    treeCache = tree.map(path => ({ path, type: 'blob' }))
+    treeFromBuild = true
+  }
+  if (flags) _flagsCache = new Map(flags)
+  if (article) articleCache.set(article.slug, { ...article, fromBuild: true })
+  if (license !== undefined) licenseCache = license
 }
 
 export { pathToSlug, slugToPath }

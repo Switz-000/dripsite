@@ -1,3 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/article/:slug", "destination": "/article/:slug/index.html" },
+    { "source": "/wiki", "destination": "/wiki/index.html" },
+    { "source": "/(.*)", "destination": "/spa.html" }
+  ]
 }
