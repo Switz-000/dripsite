@@ -3,6 +3,8 @@
   "rewrites": [
     { "source": "/article/:slug", "destination": "/article/:slug/index.html" },
     { "source": "/wiki", "destination": "/wiki/index.html" },
+    { "source": "/browse", "destination": "/browse/index.html" },
+    { "source": "/map", "destination": "/map/index.html" },
     { "source": "/(.*)", "destination": "/spa.html" }
   ]
 }

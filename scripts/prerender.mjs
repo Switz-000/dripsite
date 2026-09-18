@@ -7,13 +7,13 @@
 //   1. loads the dripwiki vault (scripts/vault.mjs)
 //   2. compiles src/entry-server.jsx so Node can render the site's own
 //      React components
-//   3. renders the landing page, the wiki home and every article into
-//      dist/, each with its own title, description and canonical link,
+//   3. renders the landing page, the wiki home, browse, the map and every
+//      article into dist/, each with its own title, description and canonical link,
 //      and with the data it was built from baked in, so the app starts
 //      from what's on screen instead of fetching it again
 //   4. writes robots.txt and sitemap.xml
 //
-// Everything that isn't prerendered (/browse, /map, /search, old links)
+// Everything that isn't prerendered (/search, old links, unknown URLs)
 // gets dist/spa.html, the plain app shell, via the rewrites in vercel.json.
 
 import fs from 'node:fs'
@@ -124,6 +124,11 @@ if (written === 0) throw new Error('prerender: no article could be rendered')
 // Wiki home (in-universe)
 writePage('/wiki', { title: shellTitle, description: SITE.description, data: { tree, flags } })
 
+// Browse (every article, grouped) and the map (every country): the pages a
+// reader without JavaScript, like an AI fetcher, uses to find everything else
+writePage('/browse', { title: shellTitle, description: SITE.description, data: { tree, flags } })
+writePage('/map', { title: shellTitle, description: SITE.description, data: { tree, flags } })
+
 // Landing page (out of universe). Written last: it replaces dist/index.html,
 // which everything above used as the template.
 writePage('/', {
@@ -159,7 +164,7 @@ const sitemap = [
 ].join('\n')
 fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap)
 
-console.log(`prerender: ${written} of ${bySlug.size} articles, plus / and /wiki, in ${((Date.now() - started) / 1000).toFixed(1)}s`)
+console.log(`prerender: ${written} of ${bySlug.size} articles, plus /, /wiki, /browse and /map, in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 console.log(`prerender: robots.txt (${BLOCKED_CRAWLERS.length} crawlers blocked), sitemap.xml (${pages.length} URLs)`)
 
 // ── helpers ───────────────────────────────────────────────────
