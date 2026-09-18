@@ -56,7 +56,7 @@ export const LANDING = {
     {
       heading: 'What is Dripstao?',
       paragraphs: [
-        'TODO: what Dripstao is, for someone who has never heard of it.',
+        'Dripstao (or Dripstão in portuguese) is a speculative-fiction worldbuilding project centered on the Techno-Federative Republic of Susia and Confia the United Syndicates of Confia, spanning roughly 500 years of in-universe history and tracing how its political philosophy, institutions, economics, culture, and language evolved. ',
       ],
     },
     {
@@ -87,6 +87,18 @@ export const LANDING = {
       heading: 'Who makes it',
       paragraphs: [
         'TODO: the authors, and how the project started.',
+      ],
+    },
+        {
+      heading: 'Join the community',
+      paragraphs: [
+        'Ask questions, give feedback, and discuss the world with other readers and contributors! Everyone is welcome! (Except Tekurs)',
+      ],
+      // Optional list of links under the paragraphs
+      links: [
+        { label: 'Our Discord server',               to: 'https://discord.gg/CnEmsQkmtP' },
+        { label: 'The map',             to: '/map' },
+        { label: 'Browse all articles', to: '/browse' },
       ],
     },
   ],
