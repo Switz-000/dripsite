@@ -60,6 +60,10 @@ const tree = vault.articles
 const treeObjects = tree.map(p => ({ path: p, type: 'blob' }))
 const flags = [...ssr.buildFlagMap(vault.files.map(p => ({ path: p, type: 'blob' })))]
 const license = vault.exists('LICENSE') ? vault.read('LICENSE') : null
+// Written by generate_chronology.py in dripwiki. A vault without it simply
+// has no chronology page.
+const chronology = vault.exists('chronology.json') ? JSON.parse(vault.read('chronology.json')) : null
+if (!chronology) console.warn('prerender: no chronology.json in the vault, /chronology not written')
 const flagMap = new Map(flags)
 
 // ── 3. Pages ──────────────────────────────────────────────────
@@ -157,6 +161,12 @@ writePage('/map', { title: shellTitle, description: SITE.description, data: { tr
 // The app renders its own not-found page for any URL it doesn't know.
 writePage('/404', { title: shellTitle, description: null, data: { tree, flags }, file: '404.html', index: false })
 
+// Chronology, from chronology.json rather than from CHRONOLOGY.md: the
+// markdown is a rendering, the JSON is the data
+if (chronology) {
+  writePage('/chronology', { title: shellTitle, description: SITE.description, data: { tree, flags, chronology } })
+}
+
 // Landing page (out of universe). Written last: it replaces dist/index.html,
 // which everything above used as the template.
 writePage('/', {
@@ -194,7 +204,8 @@ for (const [url, fingerprint] of Object.entries(fingerprints)) {
   seen[url] = before?.[0] === fingerprint ? before : [fingerprint, today]
 }
 
-const pages = ['/', '/wiki', '/browse', '/map', ...[...bySlug.keys()].sort().map(s => `/article/${s}`)]
+const pages = ['/', '/wiki', '/browse', '/map', ...(chronology ? ['/chronology'] : []),
+  ...[...bySlug.keys()].sort().map(s => `/article/${s}`)]
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -204,7 +215,7 @@ const sitemap = [
 ].join('\n')
 fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap)
 
-console.log(`prerender: ${written} of ${bySlug.size} articles, plus /, /wiki, /browse and /map, in ${((Date.now() - started) / 1000).toFixed(1)}s`)
+console.log(`prerender: ${written} of ${bySlug.size} articles, plus /, /wiki, /browse, /map${chronology ? ' and /chronology' : ''}, in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 console.log(`prerender: robots.txt (${BLOCKED_CRAWLERS.length} crawlers blocked), sitemap.xml (${pages.length} URLs)`)
 
 // ── 5. IndexNow ───────────────────────────────────────────────
