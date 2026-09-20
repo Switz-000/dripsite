@@ -1140,3 +1140,74 @@ a:visited { color: var(--link-visited); }
   .landing { padding: 48px 16px 64px; }
   .landing-hero h1 { font-size: 2.3rem; }
 }
+
+/* ── Chronology ───────────────────────────────────────────────── */
+.chrono { --people: var(--link); --institutions: #d9a95b; --events: #e0786a; --documents: #86c29a; }
+.chrono .g-people { --c: var(--people); }
+.chrono .g-institutions { --c: var(--institutions); }
+.chrono .g-events { --c: var(--events); }
+.chrono .g-documents { --c: var(--documents); }
+.chrono-lede { color: var(--text-secondary); font-size: 0.97rem; line-height: 1.55; margin: 10px 0 20px; max-width: 640px; }
+.chrono-lede strong { color: var(--text-primary); }
+.chrono-missing { color: var(--link-missing, var(--text-muted)); }
+.chrono-empty { color: var(--text-secondary); font-style: italic; margin-top: 30px; }
+
+.chrono-bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); padding: 10px 0 10px; }
+.chrono-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chrono-spacer { flex: 1; }
+.chrono-tabs { display: inline-flex; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+.chrono-tabs button { all: unset; cursor: pointer; font: 500 0.78rem var(--font-ui); color: var(--text-secondary); padding: 6px 12px; border-radius: 6px; }
+.chrono-tabs button[aria-pressed="true"] { background: var(--bg-elevated); color: var(--text-primary); }
+.chrono-chip { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font: 500 0.78rem var(--font-ui); color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px 5px 9px; }
+.chrono-chip[aria-pressed="false"] { opacity: 0.42; }
+.chrono-n { color: var(--text-secondary); font: 0.68rem var(--font-mono); }
+.chrono-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.chrono select { font: 500 0.78rem var(--font-ui); color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+
+.chrono-strip { display: flex; align-items: flex-end; gap: 2px; height: 44px; margin-top: 10px; }
+.chrono-dec { all: unset; cursor: pointer; flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column-reverse; justify-content: flex-start; }
+.chrono-dec span { display: block; background: var(--c); opacity: 0.85; }
+.chrono-dec:hover span { opacity: 1; }
+.chrono-dec.empty { background: linear-gradient(to top, var(--border) 1px, transparent 1px); }
+.chrono-axis { display: flex; justify-content: space-between; font: 0.64rem var(--font-mono); color: var(--text-muted); margin-top: 4px; }
+
+.chrono-timeline { position: relative; margin-top: 24px; }
+.chrono-timeline::before { content: ""; position: absolute; left: 92px; top: 4px; bottom: 0; width: 1px; background: var(--border); }
+.chrono-year { display: grid; grid-template-columns: 78px 1fr; gap: 0 28px; padding: 10px 0; scroll-margin-top: 130px; }
+.chrono-ylabel { font: 500 1.05rem/1.5 var(--font-mono); color: var(--text-primary); text-align: right; position: sticky; top: 130px; align-self: start; }
+.chrono-year ul { list-style: none; margin: 0; padding: 0; }
+.chrono-ev { position: relative; padding: 3px 0 7px; font-size: 0.97rem; line-height: 1.5; }
+.chrono-ev::before { content: ""; position: absolute; left: -19px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--bg); }
+.chrono-kind { display: inline-block; font: 600 0.62rem/1 var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--c); margin-right: 9px; vertical-align: 1.5px; }
+.chrono-ev em { color: var(--text-secondary); }
+.chrono-country { font: 0.68rem var(--font-ui); color: var(--text-muted); margin-left: 8px; white-space: nowrap; }
+.chrono-gap { margin: 6px 0 6px 106px; font-style: italic; font-size: 0.85rem; color: var(--text-muted); }
+.chrono-gap::before { content: ""; display: inline-block; width: 18px; border-top: 1px dashed var(--text-muted); vertical-align: middle; margin-right: 10px; }
+
+.chrono-spans { margin-top: 20px; }
+.chrono-lane h2 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 400; margin: 28px 0 6px; }
+.chrono-saxis { position: sticky; top: 124px; z-index: 4; display: grid; grid-template-columns: 230px 1fr; gap: 14px; background: var(--bg); padding: 6px 0 8px; border-bottom: 1px solid var(--border); }
+.chrono-ticks { position: relative; height: 14px; font: 0.64rem var(--font-mono); color: var(--text-muted); }
+.chrono-ticks span { position: absolute; transform: translateX(-50%); }
+.chrono-srow { display: grid; grid-template-columns: 230px 1fr; align-items: center; gap: 14px; min-height: 26px; }
+.chrono-slabel { font-size: 0.85rem; line-height: 1.25; text-align: right; color: var(--text-secondary); }
+.chrono-track { position: relative; height: 18px; background: var(--bg-surface); }
+.chrono-grid { position: absolute; inset: 0; pointer-events: none; }
+.chrono-grid i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule, var(--border)); opacity: 0.6; }
+.chrono-span { position: absolute; top: 2px; height: 14px; border-radius: 3px; background: var(--link); opacity: 0.9; min-width: 4px; }
+.chrono-span.open { background: linear-gradient(to right, var(--link) 70%, transparent); }
+.chrono-span:hover { opacity: 1; outline: 1px solid var(--text-primary); }
+.chrono-who { position: absolute; left: calc(100% + 6px); top: 0; font-size: 0.8rem; line-height: 14px; color: var(--text-primary); white-space: nowrap; }
+.chrono-who a { color: var(--text-primary); }
+.chrono-span.inside .chrono-who { left: 6px; color: var(--bg); font-weight: 600; }
+.chrono-span.inside .chrono-who a { color: var(--bg); }
+.chrono-span.flip .chrono-who { left: auto; right: calc(100% + 6px); }
+
+@media (max-width: 720px) {
+  .chrono-timeline::before { left: 58px; }
+  .chrono-year { grid-template-columns: 48px 1fr; gap: 0 20px; }
+  .chrono-ylabel { font-size: 0.9rem; top: 120px; }
+  .chrono-ev::before { left: -15px; }
+  .chrono-gap { margin-left: 70px; }
+  .chrono-srow, .chrono-saxis { grid-template-columns: 110px 1fr; }
+}

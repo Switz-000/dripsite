@@ -462,13 +462,34 @@ export function useLicense() {
   return text
 }
 
+// ── Chronology ────────────────────────────────────────────────
+// chronology.json is written by generate_chronology.py in dripwiki: every
+// dated event, and every span (a term, a war, an institution's life, an
+// interlude) as one row with a start and an end. undefined = not loaded,
+// null = the vault has no chronology.json.
+let chronologyCache
+
+export function useChronology() {
+  const [data, setData] = useState(chronologyCache)
+
+  useEffect(() => {
+    if (chronologyCache !== undefined && chronologyCache !== null && !chronologyCache.fromBuild) return
+    fetch(rawFileUrl('chronology.json'))
+      .then(res => (res.ok ? res.json() : null))
+      .then(d => { chronologyCache = d; setData(d) })
+      .catch(() => { if (chronologyCache === undefined) { chronologyCache = null; setData(null) } })
+  }, [])
+
+  return data
+}
+
 // ── Build-time data ───────────────────────────────────────────
 // Fills the caches above with data baked into a prerendered page (see
 // scripts/prerender.mjs), so the hooks render it on the very first pass
 // instead of showing a spinner and fetching it again. Called by main.jsx in
 // the browser, and by the prerender in Node before it renders each page.
 // Anything baked in is still refreshed from GitHub in the background.
-export function primeVault({ tree, flags, article, license } = {}) {
+export function primeVault({ tree, flags, article, license, chronology } = {}) {
   if (tree) {
     treeCache = tree.map(path => ({ path, type: 'blob' }))
     treeFromBuild = true
@@ -476,6 +497,9 @@ export function primeVault({ tree, flags, article, license } = {}) {
   if (flags) _flagsCache = new Map(flags)
   if (article) articleCache.set(article.slug, { ...article, fromBuild: true })
   if (license !== undefined) licenseCache = license
+  if (chronology !== undefined) {
+    chronologyCache = chronology && { ...chronology, fromBuild: true }
+  }
 }
 
 export { pathToSlug, slugToPath }
