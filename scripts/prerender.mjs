@@ -187,13 +187,24 @@ console.log(`prerender: robots.txt (${BLOCKED_CRAWLERS.length} crawlers blocked)
 // Every build saves a fingerprint of each page in dist/indexnow.json. A
 // production build downloads the live copy of that file, from the build
 // it is about to replace, and submits only the URLs whose fingerprint
-// differs, plus the ones that disappeared. When there is no live copy
-// (the first build with this code), everything counts as new.
+// differs, plus the ones that disappeared. With no usable live copy,
+// everything counts as new.
+//
+// If IndexNow doesn't accept the submission, this build ships the live
+// fingerprints for those URLs instead of the new ones, so the next build
+// sees them as still changed and tries again. A new key always fails once
+// like this (HTTP 403), because its key file only goes live with the build
+// that submits it.
+//
+// The file is { v: 2, pages: { url: fingerprint } }. The first version was
+// a plain map and was saved even though its submission failed, so a live
+// file without v: 2 counts as nothing submitted yet.
 //
 // Submitting never fails the build: if IndexNow is down, the pages still
-// ship and the next build compares against them as usual.
+// ship and the next build retries.
+const INDEXNOW_FILE = path.join(DIST, 'indexnow.json')
 fs.writeFileSync(path.join(DIST, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY)
-fs.writeFileSync(path.join(DIST, 'indexnow.json'), JSON.stringify(fingerprints))
+fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: fingerprints }))
 
 if (process.env.VERCEL_ENV === 'production') {
   await submitToIndexNow().catch(e => console.warn(`indexnow: nothing submitted, ${e.message}`))
@@ -205,7 +216,8 @@ async function submitToIndexNow() {
   let live = {}
   try {
     const res = await fetch(`${SITE.url}/indexnow.json`, { signal: AbortSignal.timeout(10_000) })
-    if (res.ok) live = await res.json()
+    const file = res.ok ? await res.json() : null
+    if (file?.v === 2) live = file.pages
   } catch {
     // Not there yet: unknown paths get the app shell, which isn't JSON
   }
@@ -215,20 +227,40 @@ async function submitToIndexNow() {
     console.log('indexnow: no page changed since the live build, nothing submitted')
     return
   }
-  const res = await fetch('https://api.indexnow.org/indexnow', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({
-      host: new URL(SITE.url).host,
-      key: INDEXNOW_KEY,
-      keyLocation: `${SITE.url}/${INDEXNOW_KEY}.txt`,
-      urlList: [...changed, ...removed].map(url => SITE.url + url),
-    }),
-    signal: AbortSignal.timeout(15_000),
-  })
+
+  let status
+  try {
+    const res = await fetch('https://api.indexnow.org/indexnow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        host: new URL(SITE.url).host,
+        key: INDEXNOW_KEY,
+        keyLocation: `${SITE.url}/${INDEXNOW_KEY}.txt`,
+        urlList: [...changed, ...removed].map(url => SITE.url + url),
+      }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    status = res.status
+  } catch (e) {
+    status = e.message
+  }
+
   // 200 accepted, 202 accepted but the key is still being checked
-  const log = res.ok ? console.log : console.warn
-  log(`indexnow: ${changed.length} new or changed and ${removed.length} removed URL(s) submitted, HTTP ${res.status}`)
+  const counts = `${changed.length} new or changed and ${removed.length} removed URL(s)`
+  const reason = typeof status === 'number' ? `HTTP ${status}` : status
+  if (status === 200 || status === 202) {
+    console.log(`indexnow: ${counts} submitted, ${reason}`)
+    return
+  }
+  const kept = { ...fingerprints }
+  for (const url of changed) {
+    if (url in live) kept[url] = live[url]
+    else delete kept[url]
+  }
+  for (const url of removed) kept[url] = live[url]
+  fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: kept }))
+  console.warn(`indexnow: ${counts} not accepted (${reason}), the next build tries them again`)
 }
 
 // ── helpers ───────────────────────────────────────────────────
