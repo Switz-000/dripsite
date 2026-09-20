@@ -11,6 +11,7 @@ import App from './App'
 
 export { primeVault, buildArticle } from './hooks/useVault'
 export { buildFlagMap } from './utils/github'
+export { infoboxImageOf, countryFlagOf } from './utils/articleImage'
 
 export function render(url) {
   return renderToString(

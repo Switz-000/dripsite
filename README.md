@@ -2,48 +2,33 @@
 
 Live at https://dripsite.vercel.app
 
-A Wikipedia-style encyclopedia site that reads directly from the [dripwiki](https://github.com/Switz-000/dripwiki) Obsidian vault on GitHub.
+The site for the Dripstao wiki. The articles live in [dripwiki](https://github.com/Switz-000/dripwiki), an Obsidian vault. This repo is only the code.
 
 ## How it works
 
-- Fetches the file tree from the GitHub API on first load
-- Fetches individual `.md` files as you navigate to articles
-- Parses YAML frontmatter → infobox
-- Resolves `[[wikilinks]]` → internal navigation links
-- Strips Obsidian-specific syntax (dataview blocks, `%%` comments)
-- Full-text search via Fuse.js (title + path, no pre-indexing needed)
+`npm run build` does two things:
 
-## Configuration
+1. `vite build` builds the React app.
+2. `scripts/prerender.mjs` downloads dripwiki and writes a real HTML page for every article, plus `/`, `/wiki`, `/browse` and `/map`, so pages load without waiting on GitHub and search engines can read them. It also writes `robots.txt`, `sitemap.xml` and `404.html`, and tells IndexNow (Bing) which pages changed.
 
-Everything lives in `src/utils/github.js`:
+In the browser the app starts from the page it was served with and checks GitHub in the background for edits made after the build.
 
-```js
-export const REPO_CONFIG = {
-  owner: 'Switz-000',
-  repo:  'dripwiki',
-  branch: 'main',
-  rootPath: '',        // subfolder if needed, e.g. 'vault'
-  token: null,         // only needed for private repos
-}
+Article URLs come from the file name: `Armadesh Versij.md` is `/article/armadesh-versij`. Old links with the base64 vault path still work and redirect to the new URL.
+
+## Updating
+
+- Pushing to `main` here makes Vercel rebuild.
+- Vault edits: dripwiki has a workflow (`.github/workflows/nightly-rebuild.yml`) that rebuilds the site once a night if anything was pushed there. It can also be run by hand from dripwiki's Actions tab.
+
+## Config
+
+Site text, featured articles, blocked crawlers, the link preview image, theme colours and the IndexNow key are in `src/config.js`. The repo it reads from is `REPO_CONFIG` in `src/utils/github.js`.
+
+## Running locally
+
 ```
-
-For private repos: create a `.env` file with `VITE_GITHUB_TOKEN=ghp_yourtoken`
-and add the same variable in Vercel's Environment Variables settings.
-
-## Updating featured articles
-
-Edit the `FEATURED` array in `src/pages/HomePage.jsx` to link to articles
-using their vault path with `/` replaced by `__`.
-
-Example: `01 - Susia/06 - Characters/Armadesh Versij`
-becomes slug: `01 - Susia__06 - Characters__Armadesh Versij`
-
-## GitHub API rate limits
-
-- Unauthenticated: 60 requests/hour per IP
-- With a token: 5,000/hour
-
-The app caches the file tree and each article in memory for the session,
-so in practice you'll only hit the API once per article per visit.
-Adding a `VITE_GITHUB_TOKEN` (read-only, public_repo scope) is recommended
-for a public site with real traffic.
+npm install
+npm run dev                            # dev server
+npm run build                          # full build into dist/, downloads dripwiki
+VAULT_DIR=../dripwiki npm run build    # same, with a local copy of the vault
+```

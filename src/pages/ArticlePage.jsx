@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useArticle, useFileTree, useFlags } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
-import { wikilinkToSlug, flagUrlFor, pathToSlug } from '../utils/github'
+import { wikilinkToSlug, pathToSlug } from '../utils/github'
+import { infoboxImageOf, countryFlagOf } from '../utils/articleImage'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import PersonInfobox from '../components/PersonInfobox'
@@ -119,15 +120,10 @@ export default function ArticlePage() {
   const typeLabel = getTypeLabel(article.meta)
   const crumbs = getBreadcrumb(article.path)
 
-  const HTML_IMG_RE = /<img[^>]+src="([^"]+)"/
-  const infoboxImage = HTML_IMG_RE.exec(article.html)?.[1] ?? null
+  const infoboxImage = infoboxImageOf(article)
   const wikilinkFn = tree ? (text) => wikilinkToSlug(text, tree) : null
 
-  // Country flag — matched by article filename against "Country Flags" images
-  const articleBaseName = article.path.split('/').pop().replace(/\.md$/, '')
-  const flagUrl = article.meta.type === 'country'
-    ? (flagUrlFor(articleBaseName, flags) || flagUrlFor(article.title, flags))
-    : null
+  const flagUrl = countryFlagOf(article, flags)
 
   return (
     <>
