@@ -1,5 +1,7 @@
 # Dripsite
 
+Live at https://dripsite.vercel.app
+
 A Wikipedia-style encyclopedia site that reads directly from the [dripwiki](https://github.com/Switz-000/dripwiki) Obsidian vault on GitHub.
 
 ## How it works

@@ -19,8 +19,7 @@ export const REPO_CONFIG = {
 export function isArticlePath(path) {
   return (
     path.endsWith('.md') &&
-    !path.startsWith('.obsidian') &&
-    !path.includes('/.obsidian/') &&
+    !path.split('/').some(part => part.startsWith('.')) &&   // .obsidian, .github, .trash
     !path.startsWith('00 - Meta/')
   )
 }
