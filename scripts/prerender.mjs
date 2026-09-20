@@ -11,11 +11,14 @@
 //      article into dist/, each with its own title, description and canonical link,
 //      and with the data it was built from baked in, so the app starts
 //      from what's on screen instead of fetching it again
-//   4. writes robots.txt and sitemap.xml
+//   4. writes robots.txt, and sitemap.xml with the date each page last
+//      changed
 //   5. on production builds, tells IndexNow which pages are new or changed
 //
-// Everything that isn't prerendered (/search, old links, unknown URLs)
-// gets dist/spa.html, the plain app shell, via the rewrites in vercel.json.
+// /search and article URLs that aren't prerendered (old base64 links,
+// typos) get dist/spa.html, the plain app shell, via the rewrites in
+// vercel.json, and the app sorts them out. Any other unknown URL gets
+// dist/404.html with a real 404 status.
 
 import fs from 'node:fs'
 import crypto from 'node:crypto'
@@ -57,6 +60,7 @@ const tree = vault.articles
 const treeObjects = tree.map(p => ({ path: p, type: 'blob' }))
 const flags = [...ssr.buildFlagMap(vault.files.map(p => ({ path: p, type: 'blob' })))]
 const license = vault.exists('LICENSE') ? vault.read('LICENSE') : null
+const flagMap = new Map(flags)
 
 // ── 3. Pages ──────────────────────────────────────────────────
 const template = fs.readFileSync(SHELL, 'utf8')
@@ -78,10 +82,15 @@ fs.writeFileSync(path.join(DIST, 'spa.html'), template.replace('</head>', `  ${t
 // all the others as changed.
 const fingerprints = {}
 
-function writePage(url, { title, description, type = 'website', data, fingerprint = data.article ?? data }) {
-  fingerprints[url] = crypto.createHash('sha1')
-    .update(JSON.stringify({ title, description, fingerprint }))
-    .digest('hex').slice(0, 12)
+// `image` is the link-preview picture. `file` overrides where the page is
+// written. `index: false` keeps a page out of search engines and out of
+// the IndexNow and sitemap bookkeeping.
+function writePage(url, { title, description, type = 'website', data, image = SITE.image, file, index = true, fingerprint = data.article ?? data }) {
+  if (index) {
+    fingerprints[url] = crypto.createHash('sha1')
+      .update(JSON.stringify({ title, description, image, fingerprint }))
+      .digest('hex').slice(0, 12)
+  }
   ssr.primeVault(data)
   const body = ssr.render(url)
   const canonical = SITE.url + url
@@ -94,6 +103,9 @@ function writePage(url, { title, description, type = 'website', data, fingerprin
     `<meta property="og:title" content="${esc(title)}">`,
     description && `<meta property="og:description" content="${esc(description)}">`,
     `<meta property="og:url" content="${canonical}">`,
+    image && `<meta property="og:image" content="${esc(image)}">`,
+    image && `<meta name="twitter:card" content="summary_large_image">`,
+    !index && `<meta name="robots" content="noindex">`,
     themeStyle,
   ].filter(Boolean).map(tag => `    ${tag}`).join('\n')
 
@@ -105,7 +117,7 @@ function writePage(url, { title, description, type = 'website', data, fingerprin
       `<div id="root">${body}</div>\n    <script id="preload" type="application/json">${json(data)}</script>`)
   if (!html.includes('id="preload"')) throw new Error('prerender: could not find <div id="root"></div> in dist/index.html')
 
-  const file = url === '/' ? 'index.html' : `${url.slice(1)}/index.html`
+  file ??= url === '/' ? 'index.html' : `${url.slice(1)}/index.html`
   fs.mkdirSync(path.dirname(path.join(DIST, file)), { recursive: true })
   fs.writeFileSync(path.join(DIST, file), html)
 }
@@ -120,6 +132,7 @@ for (const [slug, articlePath] of bySlug) {
       title: `${article.title} — ${SITE.name}`,   // same format as ArticlePage
       description: describe(article),
       type: 'article',
+      image: ssr.infoboxImageOf(article) || ssr.countryFlagOf(article, flagMap) || SITE.image,
       data: { tree, flags, article },
     })
     written++
@@ -139,6 +152,10 @@ writePage('/wiki', { title: shellTitle, description: SITE.description, data: { t
 // reader without JavaScript, like an AI fetcher, uses to find everything else
 writePage('/browse', { title: shellTitle, description: SITE.description, data: { tree, flags } })
 writePage('/map', { title: shellTitle, description: SITE.description, data: { tree, flags } })
+
+// Not found page, served by Vercel with a 404 status for unknown URLs.
+// The app renders its own not-found page for any URL it doesn't know.
+writePage('/404', { title: shellTitle, description: null, data: { tree, flags }, file: '404.html', index: false })
 
 // Landing page (out of universe). Written last: it replaces dist/index.html,
 // which everything above used as the template.
@@ -166,11 +183,22 @@ const robots = [
 ].join('\n')
 fs.writeFileSync(path.join(DIST, 'robots.txt'), robots)
 
+// Last-changed dates come from the live dist/indexnow.json (section 5):
+// `seen` holds each page's fingerprint and the date it first appeared.
+// Same fingerprint as live, same date; otherwise the page changed today.
+const live = await fetchLiveIndexNowFile()
+const today = new Date().toISOString().slice(0, 10)
+const seen = {}
+for (const [url, fingerprint] of Object.entries(fingerprints)) {
+  const before = live.seen[url]
+  seen[url] = before?.[0] === fingerprint ? before : [fingerprint, today]
+}
+
 const pages = ['/', '/wiki', '/browse', '/map', ...[...bySlug.keys()].sort().map(s => `/article/${s}`)]
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...pages.map(p => `  <url><loc>${SITE.url}${p}</loc></url>`),
+  ...pages.map(p => `  <url><loc>${SITE.url}${p}</loc>${seen[p] ? `<lastmod>${seen[p][1]}</lastmod>` : ''}</url>`),
   '</urlset>',
   '',
 ].join('\n')
@@ -196,15 +224,17 @@ console.log(`prerender: robots.txt (${BLOCKED_CRAWLERS.length} crawlers blocked)
 // like this (HTTP 403), because its key file only goes live with the build
 // that submits it.
 //
-// The file is { v: 2, pages: { url: fingerprint } }. The first version was
-// a plain map and was saved even though its submission failed, so a live
-// file without v: 2 counts as nothing submitted yet.
+// The file is { v: 2, pages: { url: fingerprint }, seen: { url: [fingerprint,
+// date] } }. `pages` is what IndexNow has accepted, `seen` feeds the
+// sitemap dates (section 4). The first version was a plain map and was
+// saved even though its submission failed, so a live file without v: 2
+// counts as nothing submitted yet.
 //
 // Submitting never fails the build: if IndexNow is down, the pages still
 // ship and the next build retries.
 const INDEXNOW_FILE = path.join(DIST, 'indexnow.json')
 fs.writeFileSync(path.join(DIST, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY)
-fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: fingerprints }))
+fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: fingerprints, seen }))
 
 if (process.env.VERCEL_ENV === 'production') {
   await submitToIndexNow().catch(e => console.warn(`indexnow: nothing submitted, ${e.message}`))
@@ -212,17 +242,22 @@ if (process.env.VERCEL_ENV === 'production') {
   console.log(`indexnow: ${Object.keys(fingerprints).length} fingerprints saved, nothing submitted (not a production build)`)
 }
 
-async function submitToIndexNow() {
-  let live = {}
+// The live site's indexnow.json, from the build this one is about to replace
+async function fetchLiveIndexNowFile() {
   try {
     const res = await fetch(`${SITE.url}/indexnow.json`, { signal: AbortSignal.timeout(10_000) })
     const file = res.ok ? await res.json() : null
-    if (file?.v === 2) live = file.pages
+    if (file?.v === 2) return { pages: file.pages, seen: file.seen ?? {} }
   } catch {
-    // Not there yet: unknown paths get the app shell, which isn't JSON
+    // Not there yet, or not reachable: start from nothing
   }
-  const changed = Object.keys(fingerprints).filter(url => live[url] !== fingerprints[url])
-  const removed = Object.keys(live).filter(url => !(url in fingerprints))
+  return { pages: {}, seen: {} }
+}
+
+async function submitToIndexNow() {
+  const submitted = live.pages
+  const changed = Object.keys(fingerprints).filter(url => submitted[url] !== fingerprints[url])
+  const removed = Object.keys(submitted).filter(url => !(url in fingerprints))
   if (!changed.length && !removed.length) {
     console.log('indexnow: no page changed since the live build, nothing submitted')
     return
@@ -255,11 +290,11 @@ async function submitToIndexNow() {
   }
   const kept = { ...fingerprints }
   for (const url of changed) {
-    if (url in live) kept[url] = live[url]
+    if (url in submitted) kept[url] = submitted[url]
     else delete kept[url]
   }
-  for (const url of removed) kept[url] = live[url]
-  fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: kept }))
+  for (const url of removed) kept[url] = submitted[url]
+  fs.writeFileSync(INDEXNOW_FILE, JSON.stringify({ v: 2, pages: kept, seen }))
   console.warn(`indexnow: ${counts} not accepted (${reason}), the next build tries them again`)
 }
 
@@ -281,6 +316,8 @@ function describe(article) {
   if (!source) return null
   const text = String(source)
     .replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, '$2')   // [[Target|Label]] -> Label
+    .replace(/^\s*\|?\s*:?-{3,}.*$/gm, '')           // table separator rows
+    .replace(/\|/g, ' ')                               // table cells -> plain text
     .replace(/<[^>]+>/g, '')                          // stray HTML
     .replace(/[*_`#>]/g, '')                          // markdown marks
     .replace(/\s+/g, ' ')

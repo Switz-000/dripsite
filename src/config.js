@@ -15,6 +15,9 @@ export const SITE = {
   footer:      'Content on this encyclopedia is freely available under the YM TU-(C4) license.',
   // Public address, used for the sitemap and canonical links
   url:         'https://dripsite.vercel.app',
+  // Picture shown in link previews (WhatsApp, Discord...) for pages that
+  // have none of their own. Articles use their infobox image or flag first.
+  image:       'https://raw.githubusercontent.com/Switz-000/dripwiki/main/00%20-%20Meta/Images/Susia%20Modernista%20Mapa.png',
 }
 
 // ── IndexNow ──────────────────────────────────────────────────
