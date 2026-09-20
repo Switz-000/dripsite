@@ -17,6 +17,13 @@ export const SITE = {
   url:         'https://dripsite.vercel.app',
 }
 
+// ── IndexNow ──────────────────────────────────────────────────
+// Tells Bing, and DuckDuckGo through Bing, which pages are new or changed
+// on each production build. See section 5 of scripts/prerender.mjs.
+// The key is public on purpose: the build serves it at /<key>.txt, which
+// proves to the search engines that whoever submits URLs owns the site.
+export const INDEXNOW_KEY = 'a999f8ca15a8c88ccab529249f0c4bef'
+
 // ── Crawlers (robots.txt) ─────────────────────────────────────
 // robots.txt is generated at build time by scripts/prerender.mjs.
 // These AI training crawlers are told to stay out, in line with the
