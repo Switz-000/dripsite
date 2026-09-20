@@ -15,10 +15,10 @@
 //      changed
 //   5. on production builds, tells IndexNow which pages are new or changed
 //
-// /search and article URLs that aren't prerendered (old base64 links,
-// typos) get dist/spa.html, the plain app shell, via the rewrites in
-// vercel.json, and the app sorts them out. Any other unknown URL gets
-// dist/404.html with a real 404 status.
+// /search gets dist/spa.html, the plain app shell, via the rewrites in
+// vercel.json. Any other URL that isn't a file gets dist/404.html with a
+// real 404 status. That page is the full app, so in the browser it still
+// sorts out what it can: old base64 article links redirect to the new URL.
 
 import fs from 'node:fs'
 import crypto from 'node:crypto'
