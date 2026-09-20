@@ -12,17 +12,19 @@
 //      and with the data it was built from baked in, so the app starts
 //      from what's on screen instead of fetching it again
 //   4. writes robots.txt and sitemap.xml
+//   5. on production builds, tells IndexNow which pages are new or changed
 //
 // Everything that isn't prerendered (/search, old links, unknown URLs)
 // gets dist/spa.html, the plain app shell, via the rewrites in vercel.json.
 
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import { loadVault } from './vault.mjs'
 import { pathToSlug } from '../src/utils/slugs.js'
-import { SITE, LANDING, THEME, BLOCKED_CRAWLERS } from '../src/config.js'
+import { SITE, LANDING, THEME, BLOCKED_CRAWLERS, INDEXNOW_KEY } from '../src/config.js'
 
 const started = Date.now()
 const DIST = path.resolve('dist')
@@ -70,7 +72,16 @@ const themeStyle = '<style>:root{' + Object.entries(THEME)
 // The plain shell, for every URL that isn't prerendered
 fs.writeFileSync(path.join(DIST, 'spa.html'), template.replace('</head>', `  ${themeStyle}\n  </head>`))
 
-function writePage(url, { title, description, type = 'website', data }) {
+// url -> fingerprint of what the page shows, for IndexNow (section 5).
+// An article's fingerprint covers the article only, not the list of every
+// other article baked into its page, so adding one article doesn't mark
+// all the others as changed.
+const fingerprints = {}
+
+function writePage(url, { title, description, type = 'website', data, fingerprint = data.article ?? data }) {
+  fingerprints[url] = crypto.createHash('sha1')
+    .update(JSON.stringify({ title, description, fingerprint }))
+    .digest('hex').slice(0, 12)
   ssr.primeVault(data)
   const body = ssr.render(url)
   const canonical = SITE.url + url
@@ -135,6 +146,7 @@ writePage('/', {
   title: LANDING.pageTitle,
   description: LANDING.description?.startsWith('TODO') ? null : LANDING.description,
   data: { license },
+  fingerprint: { license, LANDING },   // its text lives in src/config.js
 })
 
 // ── 4. robots.txt and sitemap.xml ─────────────────────────────
@@ -166,6 +178,58 @@ fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap)
 
 console.log(`prerender: ${written} of ${bySlug.size} articles, plus /, /wiki, /browse and /map, in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 console.log(`prerender: robots.txt (${BLOCKED_CRAWLERS.length} crawlers blocked), sitemap.xml (${pages.length} URLs)`)
+
+// ── 5. IndexNow ───────────────────────────────────────────────
+// IndexNow tells Bing (and DuckDuckGo, which uses Bing's index, plus
+// Yandex, Seznam and Naver) which URLs are new, changed or gone, so they
+// get crawled first. Unlike Google's "Request indexing" it has no daily cap.
+//
+// Every build saves a fingerprint of each page in dist/indexnow.json. A
+// production build downloads the live copy of that file, from the build
+// it is about to replace, and submits only the URLs whose fingerprint
+// differs, plus the ones that disappeared. When there is no live copy
+// (the first build with this code), everything counts as new.
+//
+// Submitting never fails the build: if IndexNow is down, the pages still
+// ship and the next build compares against them as usual.
+fs.writeFileSync(path.join(DIST, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY)
+fs.writeFileSync(path.join(DIST, 'indexnow.json'), JSON.stringify(fingerprints))
+
+if (process.env.VERCEL_ENV === 'production') {
+  await submitToIndexNow().catch(e => console.warn(`indexnow: nothing submitted, ${e.message}`))
+} else {
+  console.log(`indexnow: ${Object.keys(fingerprints).length} fingerprints saved, nothing submitted (not a production build)`)
+}
+
+async function submitToIndexNow() {
+  let live = {}
+  try {
+    const res = await fetch(`${SITE.url}/indexnow.json`, { signal: AbortSignal.timeout(10_000) })
+    if (res.ok) live = await res.json()
+  } catch {
+    // Not there yet: unknown paths get the app shell, which isn't JSON
+  }
+  const changed = Object.keys(fingerprints).filter(url => live[url] !== fingerprints[url])
+  const removed = Object.keys(live).filter(url => !(url in fingerprints))
+  if (!changed.length && !removed.length) {
+    console.log('indexnow: no page changed since the live build, nothing submitted')
+    return
+  }
+  const res = await fetch('https://api.indexnow.org/indexnow', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      host: new URL(SITE.url).host,
+      key: INDEXNOW_KEY,
+      keyLocation: `${SITE.url}/${INDEXNOW_KEY}.txt`,
+      urlList: [...changed, ...removed].map(url => SITE.url + url),
+    }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  // 200 accepted, 202 accepted but the key is still being checked
+  const log = res.ok ? console.log : console.warn
+  log(`indexnow: ${changed.length} new or changed and ${removed.length} removed URL(s) submitted, HTTP ${res.status}`)
+}
 
 // ── helpers ───────────────────────────────────────────────────
 function esc(s) {
