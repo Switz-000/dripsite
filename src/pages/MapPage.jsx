@@ -70,17 +70,71 @@ function bboxViewBox(box, padFrac = 0.12) {
   return `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
 }
 
+// ── Framing: pan and pinch-zoom ───────────────────────────────
+// Drilling into a country or state sets a "base" frame; dragging and pinching
+// nudge the live frame away from it and ⟲ puts it back. On a phone this is
+// the only way to make a small country big enough to aim at, so the map is
+// pannable at every level rather than only through the drill-down.
+const WORLD_VIEW = '0 0 800 600'
+const WORLD_W = 800
+const WORLD_H = 600
+// Map width, in CSS pixels, the marker and label sizes were tuned against.
+const MAP_REF_PX = 640
+const MIN_FRAME_W = 20      // tightest zoom, in map units
+const MAX_FRAME_W = 2000    // loosest — a little wider than the continent
+
+function parseFrame(s) {
+  const n = s.split(' ').map(Number)
+  return { x: n[0], y: n[1], w: n[2], h: n[3] }
+}
+
+function formatFrame(f) {
+  return `${f.x.toFixed(1)} ${f.y.toFixed(1)} ${f.w.toFixed(1)} ${f.h.toFixed(1)}`
+}
+
+// Keep the frame's centre near the continent, so a stray drag can't fling the
+// map off into empty space with no way back but the reset button.
+function clampPan(f) {
+  const cx = Math.min(Math.max(f.x + f.w / 2, -0.25 * WORLD_W), 1.25 * WORLD_W)
+  const cy = Math.min(Math.max(f.y + f.h / 2, -0.25 * WORLD_H), 1.25 * WORLD_H)
+  return { ...f, x: cx - f.w / 2, y: cy - f.h / 2 }
+}
+
+// Scale the frame by `factor` about (fx, fy), a point in map units — so the
+// spot under the fingers (or the centre, for the buttons) stays put.
+function zoomFrame(f, factor, fx, fy) {
+  const w = Math.min(Math.max(f.w / factor, MIN_FRAME_W), MAX_FRAME_W)
+  const k = w / f.w
+  return clampPan({ x: fx - (fx - f.x) * k, y: fy - (fy - f.y) * k, w, h: f.h * k })
+}
+
 export default function MapPage() {
   const [view, setView] = useState('world')
   const [activeCountry, setActiveCountry] = useState(null)
   const [activeState, setActiveState] = useState(null)
   const [hoveredId, setHoveredId] = useState(null)
   const [hoveredCity, setHoveredCity] = useState(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const [viewBox, setViewBox] = useState('0 0 800 600')
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0, w: 0, h: 0 })
+  const [viewBox, setViewBox] = useState(WORLD_VIEW)
+  // The framing the current view was entered at — what ⟲ goes back to.
+  const [baseView, setBaseView] = useState(WORLD_VIEW)
   const navigate = useNavigate()
   const flags = useFlags()
   const svgRef = useRef(null)
+
+  // ── Touch or mouse? ───────────────────────────────────────────
+  // A phone has no hover, so the tooltip can't be driven by it: there a tap
+  // peeks at a city and a second tap opens its article. Checked at runtime
+  // rather than by width, since a small window on a laptop still has a mouse.
+  const [coarse, setCoarse] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(hover: none), (pointer: coarse)')
+    const apply = () => setCoarse(mq.matches)
+    apply()
+    mq.addEventListener?.('change', apply)
+    return () => mq.removeEventListener?.('change', apply)
+  }, [])
 
   // ── Coordinate picker (dev tool) ──────────────────────────────
   // Click the map while active to read off cx/cy for mapData.js
@@ -100,15 +154,19 @@ export default function MapPage() {
     })
   }
 
-  // Rendered width of the <svg> in CSS pixels. Together with the viewBox width
-  // it gives the map's current scale, so marker/label sizes can be authored in
+  // Rendered size of the <svg> in CSS pixels. Together with the viewBox it
+  // gives the map's current scale, so marker/label sizes can be authored in
   // screen pixels and stay identical whether you're looking at a tiny state or
-  // the whole continent.
-  const [svgPx, setSvgPx] = useState(0)
+  // the whole continent. Both dimensions matter: a tall state hits the stage's
+  // max-height and is then scaled by height, not width.
+  const [svgBox, setSvgBox] = useState({ w: 0, h: 0 })
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
-    const measure = () => setSvgPx(el.getBoundingClientRect().width)
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      setSvgBox(prev => (prev.w === r.width && prev.h === r.height ? prev : { w: r.width, h: r.height }))
+    }
     measure()
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', measure)
@@ -134,6 +192,13 @@ export default function MapPage() {
   const stateShapes = ((activeCountry && STATES[activeCountry.id]) || [])
     .map(s => ({ id: slugId(s.label), label: s.label, path: s.path }))
 
+  // Set the frame for a newly entered view, and remember it as the one ⟲
+  // returns to after panning around.
+  function frameTo(vb) {
+    setViewBox(vb)
+    setBaseView(vb)
+  }
+
   function handleCountryClick(id) {
     const country = COUNTRIES.find(c => c.id === id)
     if (!country) return
@@ -144,6 +209,7 @@ export default function MapPage() {
     }
 
     setActiveCountry(country)
+    clearPeek()
 
     // no states — skip straight to city view
     setView((STATES[id] || []).length > 0 ? 'country' : 'cities')
@@ -151,7 +217,7 @@ export default function MapPage() {
     // Frame the country: a hand-tuned viewBox if one exists, else derive it
     // from the country's own shape.
     const box = pathBBox(svgRef.current, country.path)
-    setViewBox(COUNTRY_VIEWBOXES[id] || (box ? bboxViewBox(box, 0.06) : '0 0 800 600'))
+    frameTo(COUNTRY_VIEWBOXES[id] || (box ? bboxViewBox(box, 0.06) : WORLD_VIEW))
   }
 
   function handleStateClick(id) {
@@ -159,24 +225,34 @@ export default function MapPage() {
     if (!state) return
     setActiveState(state)
     setView('state')
+    clearPeek()
     // Zoom to the state by computing its bounding box from its shape — no
     // hand-entered coordinates to get wrong.
     const box = pathBBox(svgRef.current, state.path)
-    if (box) setViewBox(bboxViewBox(box))
-    else if (activeCountry) setViewBox(COUNTRY_VIEWBOXES[activeCountry.id] || '0 0 800 600')
+    if (box) frameTo(bboxViewBox(box))
+    else if (activeCountry) frameTo(COUNTRY_VIEWBOXES[activeCountry.id] || WORLD_VIEW)
   }
 
   function goBack() {
+    clearPeek()
     if (view === 'state') {
       setView('country')
       setActiveState(null)
-      setViewBox(COUNTRY_VIEWBOXES[activeCountry?.id] || '0 0 800 600')
+      frameTo(COUNTRY_VIEWBOXES[activeCountry?.id] || WORLD_VIEW)
     } else if (view === 'country' || view === 'cities') {
       setView('world')
       setActiveCountry(null)
       setActiveState(null)
-      setViewBox('0 0 800 600')
+      frameTo(WORLD_VIEW)
     }
+  }
+
+  function goWorld() {
+    setView('world')
+    setActiveCountry(null)
+    setActiveState(null)
+    clearPeek()
+    frameTo(WORLD_VIEW)
   }
 
   // which city sizes are visible at this zoom level
@@ -213,8 +289,17 @@ export default function MapPage() {
   // map (dots, labels, strokes) is authored in pixels and multiplied by this,
   // so a big country and a small state render markers at the same size.
   const vb = viewBox.split(' ').map(Number)
-  const unitsPerPx = svgPx > 0 ? vb[2] / svgPx : vb[2] / 800
+  const scalePx = svgBox.w > 0 && svgBox.h > 0
+    ? Math.min(svgBox.w / vb[2], svgBox.h / vb[3])   // preserveAspectRatio="meet"
+    : 800 / vb[2]
+  const unitsPerPx = 1 / scalePx
   const px = n => n * unitsPerPx
+
+  // The pixel sizes in MAP_SIZING are tuned against a map about as wide as the
+  // desktop column. A phone renders the same map at barely half that, where
+  // markers and names authored in screen pixels swamp the countries under
+  // them — so they shrink with the map, down to a floor that stays readable.
+  const shrink = svgBox.w > 0 ? Math.min(1, Math.max(0.66, svgBox.w / MAP_REF_PX)) : 1
 
   // Dot radius and label size are deliberately independent: each has its own
   // per-tier pixel size and its own master scale (MAP_SIZING / ⚙ Sizing panel).
@@ -223,12 +308,18 @@ export default function MapPage() {
     const boost = city.capitalLevel === 'national'
       ? MAP_SIZING.dot.nationalBoost
       : city.capital ? MAP_SIZING.dot.capitalBoost : 1
-    return px(base * boost * sizing.dot)
+    return px(base * boost * sizing.dot * shrink)
   }
 
   function labelSize(city) {
     const base = MAP_SIZING.label.px[city.size] ?? MAP_SIZING.label.px.minor
-    return px(base * sizing.label)
+    return px(base * sizing.label * shrink)
+  }
+
+  // Invisible disc over each dot, so a fingertip has something to land on. A
+  // drawn marker is 8–14px across; a touch target needs roughly twice that.
+  function hitSize(city) {
+    return Math.max(dotSize(city) * 1.7, px(coarse ? 11 : 6))
   }
 
   // Which cities carry a visible name at this zoom level
@@ -251,8 +342,132 @@ export default function MapPage() {
       isLand,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labelled, visibleCities, viewBox, unitsPerPx, sizing.dot, sizing.label, isLand],
+    [labelled, visibleCities, viewBox, unitsPerPx, shrink, sizing.dot, sizing.label, isLand],
   )
+
+  // ── Gestures ──────────────────────────────────────────────────
+  // One finger (or the mouse) drags the map, two pinch it. Move/up are bound
+  // to the window for the duration so a drag that leaves the map still works,
+  // and pointer capture is deliberately not used — it would retarget the click
+  // that follows and break tapping a country.
+  const gesture = useRef({ pointers: new Map(), dist: 0, moved: false, start: { x: 0, y: 0 }, abort: null })
+
+  function pointerSpread(pts) {
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+  }
+
+  function moveGesture(e) {
+    const g = gesture.current
+    if (!g.pointers.has(e.pointerId)) return
+    const prev = g.pointers.get(e.pointerId)
+    const next = { x: e.clientX, y: e.clientY }
+    g.pointers.set(e.pointerId, next)
+
+    const svg = svgRef.current
+    const ctm = svg?.getScreenCTM()
+    if (!ctm || !ctm.a || !ctm.d) return
+    const pts = [...g.pointers.values()]
+
+    if (pts.length >= 2) {
+      const dist = pointerSpread(pts)
+      if (g.dist > 0 && dist > 0) {
+        if (Math.abs(dist - g.dist) > 1) g.moved = true
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+        const focus = toSvgPoint(svg, mid.x, mid.y)
+        const factor = dist / g.dist
+        setViewBox(f => formatFrame(zoomFrame(parseFrame(f), factor, focus.x, focus.y)))
+      }
+      g.dist = dist
+      return
+    }
+
+    // A tap wobbles by a pixel or two — only start dragging past a threshold,
+    // so a tap still reads as a tap.
+    if (Math.abs(next.x - g.start.x) > 6 || Math.abs(next.y - g.start.y) > 6) g.moved = true
+    if (!g.moved) return
+    const dx = (next.x - prev.x) / ctm.a
+    const dy = (next.y - prev.y) / ctm.d
+    setViewBox(f => {
+      const v = parseFrame(f)
+      return formatFrame(clampPan({ ...v, x: v.x - dx, y: v.y - dy }))
+    })
+  }
+
+  function endGesture(e) {
+    const g = gesture.current
+    g.pointers.delete(e.pointerId)
+    if (g.pointers.size < 2) g.dist = 0
+    if (g.pointers.size === 0) {
+      g.abort?.abort()
+      g.abort = null
+      // g.moved stays set until the next gesture: the click that follows this
+      // pointerup reads it to tell a drag from a tap.
+    }
+  }
+
+  function startGesture(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const g = gesture.current
+    if (g.pointers.size === 0) {
+      g.moved = false
+      g.start = { x: e.clientX, y: e.clientY }
+    }
+    g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (g.pointers.size === 2) g.dist = pointerSpread([...g.pointers.values()])
+    if (g.abort) return
+    const ac = new AbortController()
+    g.abort = ac
+    window.addEventListener('pointermove', moveGesture, { signal: ac.signal })
+    window.addEventListener('pointerup', endGesture, { signal: ac.signal })
+    window.addEventListener('pointercancel', endGesture, { signal: ac.signal })
+  }
+
+  useEffect(() => () => gesture.current.abort?.abort(), [])
+
+  function zoomBy(factor) {
+    setViewBox(f => {
+      const v = parseFrame(f)
+      return formatFrame(zoomFrame(v, factor, v.x + v.w / 2, v.y + v.h / 2))
+    })
+  }
+
+  // Follow the pointer for the tooltip and the picker readout. Bound to
+  // pointerdown as well as pointermove, because a tap produces no move and
+  // the tooltip still has to know where the finger landed.
+  function trackPointer(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width, h: rect.height })
+    if (pickerMode && svgRef.current) {
+      setLiveCoord(toSvgPoint(svgRef.current, e.clientX, e.clientY))
+    }
+  }
+
+  // ── Selecting a city ──────────────────────────────────────────
+  // With a mouse, hovering shows the tooltip and a click opens the article.
+  // With a finger there is no hover, so the first tap shows the tooltip and a
+  // second tap on the same city opens it — no more navigating away by accident
+  // when all you wanted was the population.
+  const peeked = useRef(null)
+
+  function clearPeek() {
+    peeked.current = null
+    setHoveredCity(null)
+  }
+
+  function handleCityClick(city) {
+    if (gesture.current.moved) return   // that was a drag, not a tap
+    if (!coarse) {
+      if (city.slug) navigate(`/article/${city.slug}`)
+      return
+    }
+    if (peeked.current === city.id) {
+      if (city.slug) navigate(`/article/${city.slug}`)
+      return
+    }
+    peeked.current = city.id
+    setHoveredCity(city)
+    setHoveredId(null)
+  }
 
   const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null
   const tooltip = hoveredCity
@@ -267,50 +482,58 @@ export default function MapPage() {
         }
       : null)
 
+  // Keep the tooltip inside the map box — on a narrow screen "pointer + 14px"
+  // runs off the right edge otherwise. The box shrink-wraps its text, so the
+  // clamp works off the widest it is allowed to get.
+  const TIP_W = 210
+  const tipLeft = Math.max(8, Math.min(mousePos.x + 14, Math.max(8, (mousePos.w || TIP_W + 16) - TIP_W - 8)))
+  const tipTop = Math.max(8, mousePos.y - (coarse ? 64 : 10))
+  const verb = coarse ? 'tap' : 'click'
+
   return (
-    <div className="page-inner" style={{ maxWidth: 1100 }}>
+    <div className="page-inner map-page" style={{ maxWidth: 1100 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 8 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', margin: 0 }}>
+      <div className="map-header">
+        <h1 className="map-title">
           {view === 'world' && 'Dripstan'}
           {view === 'country' && activeCountry?.label}
           {view === 'cities' && activeCountry?.label}
           {view === 'state' && activeState?.label}
         </h1>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          {view === 'world' && 'Continent — click a country'}
-          {view === 'country' && 'Country — click a state'}
-          {view === 'cities' && 'Country — click a city'}
-          {view === 'state' && 'State — click a city'}
+        <div className="map-kicker">
+          {view === 'world' && `Continent — ${verb} a country`}
+          {view === 'country' && `Country — ${verb} a state`}
+          {view === 'cities' && `Country — ${verb} a city`}
+          {view === 'state' && `State — ${verb} a city`}
         </div>
-        <button
-          onClick={() => setSizingOpen(s => !s)}
-          className={`filter-btn${sizingOpen ? ' active' : ''}`}
-          style={{ marginLeft: 'auto' }}
-        >
-          ⚙ Sizing
-        </button>
-        <button
-          onClick={() => setPickerMode(p => !p)}
-          className="filter-btn"
-        >
-          {pickerMode ? '✕ Exit Coordinate Picker' : '📍 Coordinate Picker'}
-        </button>
-        {view !== 'world' && (
-          <button onClick={goBack} className="filter-btn">
-            ← Back
-          </button>
-        )}
+        <div className="map-actions">
+          {/* Authoring tools — no use on a phone, where they'd only crowd out
+              the map and the back button. */}
+          <div className="map-devtools">
+            <button
+              onClick={() => setSizingOpen(s => !s)}
+              className={`filter-btn${sizingOpen ? ' active' : ''}`}
+            >
+              ⚙ Sizing
+            </button>
+            <button
+              onClick={() => setPickerMode(p => !p)}
+              className="filter-btn"
+            >
+              {pickerMode ? '✕ Exit Coordinate Picker' : '📍 Coordinate Picker'}
+            </button>
+          </div>
+          {view !== 'world' && (
+            <button onClick={goBack} className="filter-btn">
+              ← Back
+            </button>
+          )}
+        </div>
       </div>
 
       {sizingOpen && (
-        <div style={{
-          marginBottom: 16, padding: '10px 12px', background: 'var(--bg-elevated)',
-          border: '1px solid var(--border-strong)', fontFamily: 'var(--font-ui)',
-          fontSize: '0.72rem', color: 'var(--text-secondary)',
-          display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
-        }}>
+        <div className="map-devtools map-sizing-panel">
           <SizeSlider
             label="Dot size"
             value={sizing.dot}
@@ -335,11 +558,7 @@ export default function MapPage() {
       )}
 
       {pickerMode && (
-        <div style={{
-          marginBottom: 16, padding: '8px 12px', background: 'var(--bg-elevated)',
-          border: '1px solid var(--border-strong)', fontFamily: 'var(--font-ui)',
-          fontSize: '0.75rem', color: 'var(--text-secondary)',
-        }}>
+        <div className="map-devtools map-picker-note">
           Click anywhere on the map to record its coordinates. Zoom into a country or state first for more precision.
         </div>
       )}
@@ -348,7 +567,7 @@ export default function MapPage() {
       <div className="breadcrumb" style={{ marginBottom: 20 }}>
         <span
           style={{ cursor: view !== 'world' ? 'pointer' : 'default', color: view !== 'world' ? 'var(--link)' : undefined }}
-          onClick={() => { setView('world'); setActiveCountry(null); setActiveState(null); setViewBox('0 0 800 600') }}
+          onClick={() => { if (view !== 'world') goWorld() }}
         >
           Dripstan
         </span>
@@ -364,7 +583,8 @@ export default function MapPage() {
                 if (view === 'state') {
                   setView('country')
                   setActiveState(null)
-                  setViewBox(COUNTRY_VIEWBOXES[activeCountry.id] || '0 0 800 600')
+                  clearPeek()
+                  frameTo(COUNTRY_VIEWBOXES[activeCountry.id] || WORLD_VIEW)
                 }
               }}
             >
@@ -375,30 +595,29 @@ export default function MapPage() {
         {activeState && <><span className="sep">/</span><span>{activeState.label}</span></>}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, alignItems: 'start' }}>
+      <div className="map-layout">
 
         {/* Map */}
         <div
-          style={{ position: 'relative', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-          onMouseMove={e => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-            if (pickerMode && svgRef.current) {
-              setLiveCoord(toSvgPoint(svgRef.current, e.clientX, e.clientY))
-            }
-          }}
+          className="map-stage"
+          onPointerMove={trackPointer}
+          onPointerDown={trackPointer}
         >
           <svg
             ref={svgRef}
+            className="map-svg"
             viewBox={viewBox}
-            style={{ width: '100%', display: 'block', transition: 'viewBox 0.4s ease', cursor: pickerMode ? 'crosshair' : undefined }}
+            style={{ cursor: pickerMode ? 'crosshair' : undefined }}
+            onPointerDown={startGesture}
             onClickCapture={e => {
               if (!pickerMode) return
               e.preventDefault()
               e.stopPropagation()
+              if (gesture.current.moved) return
               const pt = toSvgPoint(svgRef.current, e.clientX, e.clientY)
               setPickedPoints(prev => [...prev, { ...pt, label: `city_${prev.length + 1}` }])
             }}
+            onClick={e => { if (coarse && e.target === svgRef.current) clearPeek() }}
           >
             {/* Country paths — always rendered so you can click neighbors */}
             {COUNTRIES.map(c => (
@@ -416,9 +635,9 @@ export default function MapPage() {
                 stroke="var(--border-strong)"
                 strokeWidth={px(MAP_SIZING.stroke.country)}
                 style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
-                onMouseEnter={() => setHoveredId(c.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => handleCountryClick(c.id)}
+                onMouseEnter={coarse ? undefined : () => setHoveredId(c.id)}
+                onMouseLeave={coarse ? undefined : () => setHoveredId(null)}
+                onClick={() => { if (!gesture.current.moved) handleCountryClick(c.id) }}
               />
             ))}
 
@@ -443,9 +662,9 @@ export default function MapPage() {
                   stroke="var(--border-strong)"
                   strokeWidth={px(isActive ? MAP_SIZING.stroke.stateActive : MAP_SIZING.stroke.state)}
                   style={{ cursor: 'pointer', transition: 'fill 0.15s' }}
-                  onMouseEnter={() => setHoveredId(s.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => handleStateClick(s.id)}
+                  onMouseEnter={coarse ? undefined : () => setHoveredId(s.id)}
+                  onMouseLeave={coarse ? undefined : () => setHoveredId(null)}
+                  onClick={() => { if (!gesture.current.moved) handleStateClick(s.id) }}
                 />
               )
             })}
@@ -461,10 +680,11 @@ export default function MapPage() {
                 <g
                   key={city.id}
                   style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => { setHoveredCity(city); setHoveredId(null) }}
-                  onMouseLeave={() => setHoveredCity(null)}
-                  onClick={() => { if (city.slug) navigate(`/article/${city.slug}`) }}
+                  onMouseEnter={coarse ? undefined : () => { setHoveredCity(city); setHoveredId(null) }}
+                  onMouseLeave={coarse ? undefined : () => setHoveredCity(null)}
+                  onClick={() => handleCityClick(city)}
                 >
+                  <circle cx={city.cx} cy={city.cy} r={hitSize(city)} fill="transparent" />
                   {city.capitalLevel === 'national' ? (
                     <polygon
                       points={starPoints(city.cx, city.cy, r)}
@@ -519,6 +739,14 @@ export default function MapPage() {
             })}
           </svg>
 
+          {/* Zoom controls — the only way in on a phone, where there's no
+              scroll wheel and a country can be a few pixels wide */}
+          <div className="map-zoom">
+            <button onClick={() => zoomBy(1.6)} aria-label="Zoom in">+</button>
+            <button onClick={() => zoomBy(1 / 1.6)} aria-label="Zoom out">−</button>
+            <button onClick={() => setViewBox(baseView)} aria-label="Reset view">⟲</button>
+          </div>
+
           {/* Live coordinate readout while picking */}
           {pickerMode && liveCoord && (
             <div style={{
@@ -532,49 +760,31 @@ export default function MapPage() {
 
           {/* Tooltip */}
           {tooltip && (
-            <div style={{
-              position: 'absolute',
-              left: mousePos.x + 14,
-              top: mousePos.y - 10,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-strong)',
-              padding: '6px 12px',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.78rem',
-              color: 'var(--text-primary)',
-              pointerEvents: 'none',
-              zIndex: 10,
-            }}>
+            <div className="map-tooltip" style={{ left: tipLeft, top: tipTop, maxWidth: TIP_W }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 {tooltip.flag && <img src={tooltip.flag} alt="" className="flag-chip" />}
                 <span style={{ fontWeight: 600 }}>{tooltip.label}</span>
               </div>
-              {tooltip.pop != null && <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginTop: 2 }}>Pop: {tooltip.pop.toLocaleString()}</div>}
+              {tooltip.pop != null && <div className="map-tooltip-note">Pop: {tooltip.pop.toLocaleString()}</div>}
               {tooltip.isCity && (tooltip.slug
-                ? <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginTop: 2 }}>Click to open article</div>
-                : <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginTop: 2 }}>No article yet</div>)}
+                ? <div className="map-tooltip-note">{coarse ? 'Tap again to open article' : 'Click to open article'}</div>
+                : <div className="map-tooltip-note">No article yet</div>)}
             </div>
           )}
 
           {/* Legend */}
-          <div style={{
-            position: 'absolute', bottom: 10, left: 10,
-            background: 'var(--bg-surface)', border: '1px solid var(--border)',
-            padding: '6px 10px', fontFamily: 'var(--font-ui)',
-            fontSize: '0.65rem', color: 'var(--text-muted)',
-            display: 'flex', flexDirection: 'column', gap: 4
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="map-legend">
+            <div>
               <svg width="12" height="12">
                 <polygon points={starPoints(6, 6, 5.5)} fill="var(--text-primary)" />
               </svg>
               National capital
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div>
               <svg width="12" height="12"><rect x="2" y="2" width="8" height="8" fill="var(--text-primary)" /></svg>
               State capital
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div>
               <svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="var(--text-primary)" /></svg>
               City
             </div>
@@ -582,25 +792,27 @@ export default function MapPage() {
         </div>
 
         {/* Info panel */}
-        {pickerMode ? (
-          <PickedPointsPanel
-            points={pickedPoints}
-            onLabelChange={(i, label) => setPickedPoints(prev => prev.map((p, idx) => idx === i ? { ...p, label } : p))}
-            onRemove={i => setPickedPoints(prev => prev.filter((_, idx) => idx !== i))}
-            onClear={() => setPickedPoints([])}
-          />
-        ) : (
-          <InfoPanel
-            view={view}
-            country={activeCountry}
-            state={activeState}
-            states={geo?.states ?? stateShapes}
-            cities={visibleCities}
-            onStateClick={handleStateClick}
-            flags={flags}
-            loading={geoLoading}
-          />
-        )}
+        <div className="map-panel">
+          {pickerMode ? (
+            <PickedPointsPanel
+              points={pickedPoints}
+              onLabelChange={(i, label) => setPickedPoints(prev => prev.map((p, idx) => idx === i ? { ...p, label } : p))}
+              onRemove={i => setPickedPoints(prev => prev.filter((_, idx) => idx !== i))}
+              onClear={() => setPickedPoints([])}
+            />
+          ) : (
+            <InfoPanel
+              view={view}
+              country={activeCountry}
+              state={activeState}
+              states={geo?.states ?? stateShapes}
+              cities={visibleCities}
+              onStateClick={handleStateClick}
+              flags={flags}
+              loading={geoLoading}
+            />
+          )}
+        </div>
       </div>
     </div>
   )
@@ -803,12 +1015,7 @@ function SectionLabel({ children }) {
 
 function PanelRow({ children, onClick, clickable }) {
   return (
-    <div
-      onClick={onClick}
-      style={{ padding: '5px 0', borderBottom: '1px solid var(--border)', cursor: clickable ? 'pointer' : 'default', color: 'var(--text-primary)', transition: 'color 0.1s' }}
-      onMouseEnter={e => { if (clickable) e.currentTarget.style.color = 'var(--link)' }}
-      onMouseLeave={e => { if (clickable) e.currentTarget.style.color = 'var(--text-primary)' }}
-    >
+    <div className={`map-row${clickable ? ' clickable' : ''}`} onClick={onClick}>
       {children}
     </div>
   )
