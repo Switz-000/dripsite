@@ -1197,7 +1197,13 @@ a:visited { color: var(--link-visited); }
 /* One title, several rows: a rule down the gutter keeps them together, since
    the title itself is only written on the first of them. */
 .chrono-srow.grouped::before { content: ""; position: absolute; left: calc(var(--slab) + 4px); top: 0; bottom: 0; width: 1px; background: var(--border); }
-.chrono-slabel { font-size: 0.85rem; line-height: 1.25; text-align: right; color: var(--text-secondary); }
+.chrono-slabel { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 0.85rem; line-height: 1.25; text-align: right; color: var(--text-secondary); }
+/* The caret that folds a title down to one line, or opens it back out to one
+   line per term. The spacer keeps titles that have only one term aligned
+   with the rest. */
+.chrono-fold, .chrono-fold-spacer { width: 14px; flex: none; }
+.chrono-fold { background: transparent; border: none; padding: 0; line-height: 1; font-size: 0.7rem; color: var(--text-muted); cursor: pointer; }
+.chrono-fold:hover { color: var(--text-primary); }
 .chrono-track { position: relative; height: 18px; background: var(--bg-surface); }
 .chrono-grid { position: absolute; inset: 0; pointer-events: none; }
 .chrono-grid i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule, var(--border)); opacity: 0.6; }
@@ -1221,6 +1227,10 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
    bar near the right edge still has its name inside the track. */
 .chrono-span.at-over .chrono-who { top: auto; bottom: calc(100% + 3px); display: block; overflow: hidden; text-overflow: ellipsis; }
 .chrono-srow.tall { padding-top: 17px; }
+/* Folded, terms are drawn at their true width so a title's whole succession
+   fits on one line; unfolded, every bar is wide enough to be worth aiming at. */
+.chrono-srow.folded .chrono-span { min-width: 1px; }
+.chrono-probe { left: -9999px; visibility: hidden; }
 
 @media (max-width: 720px) {
   .chrono-timeline::before { left: 58px; }
