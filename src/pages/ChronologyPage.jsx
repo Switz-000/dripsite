@@ -25,7 +25,8 @@ const BIG = 10 ** 6
 // Span layout, in CSS pixels. SHADES is how many --span-N colours styles.css
 // offers for successive holders of the same title.
 const SHADES = 6
-const BAR_MIN = 6        // a single year still has to be wide enough to hit
+const BAR_MIN = 6        // unfolded, a single year still has to be wide enough to hit
+const BAR_HAIR = 1       // folded, a term is only ever as wide as the years it ran
 const LABEL_GAP = 6      // between a bar and the name drawn beside it
 const ROW_GAP = 8        // clear space two neighbours on one row need
 
@@ -239,56 +240,117 @@ function Timeline({ events, tree, showCountry }) {
 // Laying out a lane row is a packing problem: a bar is only as wide as the
 // years it covers, but the name beside it has a fixed width in pixels, so on a
 // long timeline the names of short tenures run straight into each other.
-// layoutRow measures every name, finds it a place (inside the bar, clear of it
-// on either side, or on its own line above), and then packs the bars into as
-// many stacked rows as it takes for nothing to overlap.
-function layoutRow(items, geom, pct, lo, max) {
+//
+// Which of the two gives way is what folding decides. Unfolded, the names win:
+// each is placed inside its bar or clear of it, and the bars stack into as
+// many lines as that takes. Folded, the bars win: they are drawn at their true
+// width, a title's whole succession sits on one line, and a name is only drawn
+// where it happens to fit. A title whose terms genuinely overlap in time still
+// takes more than one line, folded or not.
+function layoutRow(items, geom, pct, lo, max, folded) {
   const { px, font, bold } = geom
   const laid = items.map(s => {
+    const label = s.holder || s.label
+    // The right edge comes from b, not from left + width, so that a term
+    // ending in the year the next one starts lands on exactly its edge.
     const a = pct(s.start ?? lo)
     const b = pct(s.end ?? max + 1)
     const left = (a / 100) * px
-    const width = Math.max(((b - a) / 100) * px, BAR_MIN)
-    const label = s.holder || s.label
-    // Before the first measurement there is nothing to measure against, so
-    // every name goes to the right — what the browser would do anyway.
-    let place = 'right'
-    let nameW = 0
-    let offset = 0
-    if (px) {
-      nameW = labelWidth(label, font)
-      if (width >= labelWidth(label, bold) + 14) place = 'inside'
-      else if (left + width + LABEL_GAP + nameW <= px) place = 'right'
-      else if (left - LABEL_GAP - nameW >= 0) place = 'left'
+    const right = Math.max((b / 100) * px, left + (folded ? BAR_HAIR : BAR_MIN))
+    return {
+      span: s, a, b, left, right, label, place: 'right', offset: 0,
+      // Before the first measurement there is nothing to measure against, so
+      // every name goes to the right — what the browser would do anyway.
+      nameW: px ? labelWidth(label, font) : 0,
+      insideW: px ? labelWidth(label, bold) + 14 : Infinity,
+    }
+  })
+
+  // Where a name can go above its bar without leaving the track.
+  const over = it => Math.max(0, Math.min(it.left, px - it.nameW))
+
+  if (!folded) {
+    for (const it of laid) {
+      if (!px) continue
+      if (it.right - it.left >= it.insideW) it.place = 'inside'
+      else if (it.right + LABEL_GAP + it.nameW <= px) it.place = 'right'
+      else if (it.left - LABEL_GAP - it.nameW >= 0) it.place = 'left'
       else {
         // Nothing fits beside the bar, which on a phone is most of them:
         // the name goes above it, pulled back to stay inside the track.
-        place = 'over'
-        offset = Math.max(0, Math.min(left, px - nameW)) - left
+        it.place = 'over'
+        it.offset = over(it) - it.left
       }
     }
-    const label0 = place === 'left' ? left - LABEL_GAP - nameW
-      : place === 'over' ? Math.min(left, left + offset)
-      : left
-    const label1 = place === 'right' ? left + width + LABEL_GAP + nameW
-      : place === 'over' ? Math.max(left + width, left + offset + nameW)
-      : left + width
-    return { span: s, a, b, place, offset, from: label0, to: label1 }
-  })
+  }
+
+  // What each bar takes up on its line: the bar itself, plus the name when
+  // the name is what keeps the next bar away — which is never so folded.
+  const from = it => (it.place === 'left' && !folded ? it.left - LABEL_GAP - it.nameW : it.left)
+  const to = it => (folded ? it.right
+    : it.place === 'right' ? it.right + LABEL_GAP + it.nameW
+    : it.place === 'over' ? Math.max(it.right, it.left + it.offset + it.nameW)
+    : it.right)
 
   const stacks = []
+  const gap = folded ? 0 : ROW_GAP
   for (const it of laid) {
-    const row = stacks.find(r => r.to + ROW_GAP <= it.from)
+    // Half a pixel of slack, since the percentages the bars are drawn from
+    // do not always come back as the same float on both sides of an edge.
+    const row = stacks.find(r => r.to + gap <= from(it) + 0.5)
       || (stacks.push({ to: -BIG, items: [] }), stacks[stacks.length - 1])
     row.items.push(it)
-    row.to = Math.max(row.to, it.to)
+    row.to = Math.max(row.to, to(it))
   }
+
+  // Folded, the names are placed last, into whatever room the bars left: a
+  // lone term still gets its name, a crowded succession goes on colour alone
+  // and leaves the names to the tooltip, or to unfolding.
+  if (folded && px) {
+    for (const row of stacks) {
+      let occupied = 0        // right edge of everything already drawn on this line
+      const above = []        // and the stretches taken by names sitting above it
+      row.items.forEach((it, i) => {
+        const limit = i + 1 < row.items.length ? row.items[i + 1].left : px
+        const l0 = over(it)
+        if (it.right - it.left >= it.insideW) it.place = 'inside'
+        else if (it.right + LABEL_GAP + it.nameW <= limit) {
+          it.place = 'right'
+          occupied = it.right + LABEL_GAP + it.nameW
+        } else if (it.left - LABEL_GAP - it.nameW >= occupied) it.place = 'left'
+        else {
+          // A name longer than the whole track is clipped by the track's
+          // width, so what it takes up above the bars stops there too.
+          const l1 = Math.min(l0 + it.nameW, px)
+          if (above.some(([x0, x1]) => l0 < x1 && x0 < l1)) it.place = 'none'
+          else {
+            it.place = 'over'
+            it.offset = l0 - it.left
+            above.push([l0, l1])
+          }
+        }
+        occupied = Math.max(occupied, it.right)
+      })
+    }
+  }
+
   return stacks.map(r => r.items)
 }
 
 function Spans({ spans, groups, country, from, max, tree }) {
   const wrap = useRef(null)
   const [geom, setGeom] = useState({ px: 0, font: '', bold: '' })
+  // Titles the reader has unfolded into one line per term. Everything starts
+  // folded: a title is a line, and its terms are the colours along it.
+  const [unfolded, setUnfolded] = useState(() => new Set())
+
+  function toggleFold(id) {
+    setUnfolded(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const laneGroup = { titles: 'people', institutions: 'institutions', events: 'events' }
   const start = from === 'all' ? null : +from
@@ -307,7 +369,7 @@ function Spans({ spans, groups, country, from, max, tree }) {
       const track = el.querySelector('.chrono-track')
       if (!track) return
       const px = track.getBoundingClientRect().width
-      const cs = getComputedStyle(el.querySelector('.chrono-who') || el)
+      const cs = getComputedStyle(el.querySelector('.chrono-probe'))
       setGeom(prev => {
         const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
         return prev.px === px && prev.font === font
@@ -348,7 +410,7 @@ function Spans({ spans, groups, country, from, max, tree }) {
     const cls = 'chrono-span at-' + it.place
       + (s.end == null ? ' open' : '')
       + (s.interlude ? ' interlude' : '')
-    const name = (
+    const name = it.place === 'none' ? null : (
       <span className="chrono-who"
             style={it.place === 'over' ? { left: `${it.offset}px`, maxWidth: `${geom.px}px` } : undefined}>
         {s.interlude ? <em>{label}</em> : label}
@@ -368,6 +430,9 @@ function Spans({ spans, groups, country, from, max, tree }) {
 
   return (
     <div className="chrono-spans" ref={wrap}>
+      {/* Never drawn; it is what the names are measured against, and it is
+          here so a folded lane with no name in it still has a font to read. */}
+      <span className="chrono-who chrono-probe" aria-hidden="true">M</span>
       <div className="chrono-saxis">
         <div />
         <div className="chrono-ticks">{ticks.map(y => <span key={y} style={{ left: `${pct(y)}%` }}>{y}</span>)}</div>
@@ -406,14 +471,27 @@ function Spans({ spans, groups, country, from, max, tree }) {
               // A title whose holders did not fit on one row gets several,
               // with the title written once and a rule down the gutter
               // holding them together.
-              const stacks = layoutRow(items, geom, pct, lo, max)
+              const id = lane + '\u0000' + k
+              const folded = !unfolded.has(id)
+              const stacks = layoutRow(items, geom, pct, lo, max, folded)
               return stacks.map((row, i) => (
                 <div key={k + i}
                      className={'chrono-srow'
+                       + (folded ? ' folded' : '')
                        + (stacks.length > 1 ? ' grouped' : '')
                        + (row.some(it => it.place === 'over') ? ' tall' : '')}>
                   <div className="chrono-slabel" title={k}>
-                    {i > 0 ? '' : rowSlug ? <Link to={`/article/${rowSlug}`}>{k}</Link> : k}
+                    {i > 0 ? null : <>
+                      <span>{rowSlug ? <Link to={`/article/${rowSlug}`}>{k}</Link> : k}</span>
+                      {items.length > 1
+                        ? <button className="chrono-fold" onClick={() => toggleFold(id)}
+                                  aria-expanded={!folded}
+                                  title={`${folded ? 'Unfold' : 'Fold'} ${k}`}
+                                  aria-label={`${folded ? 'Unfold' : 'Fold'} ${k}`}>
+                            {folded ? '▸' : '▾'}
+                          </button>
+                        : <span className="chrono-fold-spacer" />}
+                    </>}
                   </div>
                   <div className="chrono-track">
                     {grid}
