@@ -292,7 +292,9 @@ a:visited { color: var(--link-visited); }
   .sidebar { transform: translateX(-240px); width: 240px; transition: transform 0.22s ease; }
   .sidebar.open { transform: translateX(0); }
   .main-content { margin-left: 0; }
-  .page-inner { padding: 24px 18px 60px; }
+  /* Room for the menu button, which is fixed over the top-left corner and
+     was otherwise sitting on the first line of every page. */
+  .page-inner { padding: 58px 18px 60px; }
   .masthead { display: none; }
   .category-grid { grid-template-columns: 1fr; }
   .mobile-menu-btn { display: flex; position: fixed; top: 14px; left: 14px; z-index: 200; background: var(--bg-surface); border: 1px solid var(--border); width: 34px; height: 34px; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); font-size: 1rem; }
@@ -1242,4 +1244,79 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
   .chrono-srow, .chrono-saxis { gap: 10px; }
   .chrono-slabel { font-size: 0.78rem; }
   .chrono-who { font-size: 0.75rem; }
+}
+
+/* ── Map ──────────────────────────────────────────────────────── */
+.map-header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.map-title { font-family: var(--font-display); font-size: 1.6rem; margin: 0; }
+.map-kicker { font-family: var(--font-ui); font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+/* Pushed to the far end on a wide screen; on a narrow one the whole group
+   drops onto its own line rather than squeezing the title. */
+.map-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.map-devtools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.map-sizing-panel {
+  display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border-strong); font-family: var(--font-ui);
+  font-size: 0.72rem; color: var(--text-secondary); gap: 22px;
+}
+.map-picker-note {
+  display: block; margin-bottom: 16px; padding: 8px 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border-strong); font-family: var(--font-ui);
+  font-size: 0.75rem; color: var(--text-secondary);
+}
+
+/* minmax(0,…) rather than 1fr: an <svg> reports its intrinsic width as its
+   min-content size, which would otherwise push the grid wider than the page. */
+.map-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+
+.map-stage { position: relative; background: var(--bg-elevated); border: 1px solid var(--border); overflow: hidden; }
+/* touch-action: none hands every gesture inside the map to the pan/pinch
+   handlers; the page is still scrollable from anywhere around it. */
+.map-svg { display: block; width: 100%; max-height: 70vh; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+.map-zoom { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 9; }
+.map-zoom button {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-surface); border: 1px solid var(--border-strong); color: var(--text-secondary);
+  font-family: var(--font-ui); font-size: 1rem; line-height: 1; cursor: pointer; padding: 0;
+  transition: color var(--transition), border-color var(--transition);
+}
+.map-zoom button:hover { color: var(--text-primary); border-color: var(--text-primary); }
+
+.map-tooltip {
+  position: absolute; background: var(--bg-surface); border: 1px solid var(--border-strong);
+  padding: 6px 12px; font-family: var(--font-ui); font-size: 0.78rem; color: var(--text-primary);
+  pointer-events: none; z-index: 10; max-width: calc(100% - 16px);
+}
+.map-tooltip-note { color: var(--text-muted); font-size: 0.68rem; margin-top: 2px; }
+
+.map-legend {
+  position: absolute; bottom: 10px; left: 10px; background: var(--bg-surface);
+  border: 1px solid var(--border); padding: 6px 10px; font-family: var(--font-ui);
+  font-size: 0.65rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;
+}
+.map-legend > div { display: flex; align-items: center; gap: 6px; }
+
+.map-row { padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--text-primary); transition: color 0.1s; }
+.map-row.clickable { cursor: pointer; }
+.map-row.clickable:hover { color: var(--link); }
+
+@media (max-width: 860px) {
+  .map-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .map-header { gap: 6px 14px; }
+  .map-title { font-size: 1.35rem; }
+  /* Dot sizing and the coordinate picker are authoring tools: on a phone they
+     only crowd out the map and the back button. */
+  .map-devtools { display: none; }
+  .map-svg { max-height: 58vh; }
+  /* Below the map rather than on top of it — there isn't room for both. */
+  .map-legend {
+    position: static; flex-direction: row; flex-wrap: wrap; gap: 4px 14px;
+    border: none; border-top: 1px solid var(--border); padding: 7px 10px;
+  }
+  /* Comfortable targets for a fingertip in the list under the map. */
+  .map-row { padding: 9px 0; }
+  .map-actions .filter-btn { font-size: 0.8rem; padding: 7px 12px; }
+  .map-zoom button { width: 36px; height: 36px; }
 }
