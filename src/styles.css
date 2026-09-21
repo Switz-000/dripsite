@@ -1143,6 +1143,10 @@ a:visited { color: var(--link-visited); }
 
 /* ── Chronology ───────────────────────────────────────────────── */
 .chrono { --people: var(--link); --institutions: #d9a95b; --events: #e0786a; --documents: #86c29a; }
+/* Successive holders of the same title cycle through these, so one tenure is
+   visibly a different person from the next. Kept light enough for the dark
+   page text drawn on top when a name fits inside its bar. */
+.chrono { --span-0: #7aaee8; --span-1: #d9a95b; --span-2: #86c29a; --span-3: #e0786a; --span-4: #b49ad8; --span-5: #68c3ce; }
 .chrono .g-people { --c: var(--people); }
 .chrono .g-institutions { --c: var(--institutions); }
 .chrono .g-events { --c: var(--events); }
@@ -1184,24 +1188,39 @@ a:visited { color: var(--link-visited); }
 .chrono-gap { margin: 6px 0 6px 106px; font-style: italic; font-size: 0.85rem; color: var(--text-muted); }
 .chrono-gap::before { content: ""; display: inline-block; width: 18px; border-top: 1px dashed var(--text-muted); vertical-align: middle; margin-right: 10px; }
 
-.chrono-spans { margin-top: 20px; }
+.chrono-spans { margin-top: 20px; --slab: 230px; }
 .chrono-lane h2 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 400; margin: 28px 0 6px; }
-.chrono-saxis { position: sticky; top: 124px; z-index: 4; display: grid; grid-template-columns: 230px 1fr; gap: 14px; background: var(--bg); padding: 6px 0 8px; border-bottom: 1px solid var(--border); }
+.chrono-saxis { position: sticky; top: 124px; z-index: 4; display: grid; grid-template-columns: var(--slab) 1fr; gap: 14px; background: var(--bg); padding: 6px 0 8px; border-bottom: 1px solid var(--border); }
 .chrono-ticks { position: relative; height: 14px; font: 0.64rem var(--font-mono); color: var(--text-muted); }
 .chrono-ticks span { position: absolute; transform: translateX(-50%); }
-.chrono-srow { display: grid; grid-template-columns: 230px 1fr; align-items: center; gap: 14px; min-height: 26px; }
+.chrono-srow { position: relative; display: grid; grid-template-columns: var(--slab) 1fr; align-items: center; gap: 14px; min-height: 26px; }
+/* One title, several rows: a rule down the gutter keeps them together, since
+   the title itself is only written on the first of them. */
+.chrono-srow.grouped::before { content: ""; position: absolute; left: calc(var(--slab) + 4px); top: 0; bottom: 0; width: 1px; background: var(--border); }
 .chrono-slabel { font-size: 0.85rem; line-height: 1.25; text-align: right; color: var(--text-secondary); }
 .chrono-track { position: relative; height: 18px; background: var(--bg-surface); }
 .chrono-grid { position: absolute; inset: 0; pointer-events: none; }
 .chrono-grid i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule, var(--border)); opacity: 0.6; }
-.chrono-span { position: absolute; top: 2px; height: 14px; border-radius: 3px; background: var(--link); opacity: 0.9; min-width: 4px; }
-.chrono-span.open { background: linear-gradient(to right, var(--link) 70%, transparent); }
-.chrono-span:hover { opacity: 1; outline: 1px solid var(--text-primary); }
+.chrono-slabel a { color: var(--text-secondary); text-decoration: none; border-bottom: 1px solid var(--border); }
+.chrono-slabel a:hover { color: var(--link-hover); border-bottom-color: currentColor; }
+.chrono-span { position: absolute; top: 2px; height: 14px; border-radius: 3px; background: var(--c, var(--link)); opacity: 0.9; min-width: 6px; display: block; }
+.chrono-span.open { background: linear-gradient(to right, var(--c, var(--link)) 70%, transparent); }
+.chrono-span.interlude { background: repeating-linear-gradient(135deg, var(--text-muted) 0 3px, transparent 3px 6px); }
+.chrono-span:hover { opacity: 1; outline: 1px solid var(--text-primary); z-index: 2; }
+a.chrono-span:hover .chrono-who { color: var(--link-hover); }
 .chrono-who { position: absolute; left: calc(100% + 6px); top: 0; font-size: 0.8rem; line-height: 14px; color: var(--text-primary); white-space: nowrap; }
-.chrono-who a { color: var(--text-primary); }
-.chrono-span.inside .chrono-who { left: 6px; color: var(--bg); font-weight: 600; }
-.chrono-span.inside .chrono-who a { color: var(--bg); }
-.chrono-span.flip .chrono-who { left: auto; right: calc(100% + 6px); }
+.chrono-who em { color: var(--text-secondary); }
+/* Where the name goes is decided in ChronologyPage.jsx, from the measured
+   width of the name and of the bar: inside it, or clear of it on either
+   side. Rows stack until every name has somewhere to sit. */
+.chrono-span.at-inside .chrono-who { left: 6px; color: var(--bg); font-weight: 600; }
+a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
+.chrono-span.at-left .chrono-who { left: auto; right: calc(100% + 6px); }
+/* Last resort, and the usual one on a phone: the name sits on its own line
+   above the bar. Its left offset is set inline, from the measurement, so a
+   bar near the right edge still has its name inside the track. */
+.chrono-span.at-over .chrono-who { top: auto; bottom: calc(100% + 3px); display: block; overflow: hidden; text-overflow: ellipsis; }
+.chrono-srow.tall { padding-top: 17px; }
 
 @media (max-width: 720px) {
   .chrono-timeline::before { left: 58px; }
@@ -1209,5 +1228,8 @@ a:visited { color: var(--link-visited); }
   .chrono-ylabel { font-size: 0.9rem; top: 120px; }
   .chrono-ev::before { left: -15px; }
   .chrono-gap { margin-left: 70px; }
-  .chrono-srow, .chrono-saxis { grid-template-columns: 110px 1fr; }
+  .chrono-spans { --slab: 110px; }
+  .chrono-srow, .chrono-saxis { gap: 10px; }
+  .chrono-slabel { font-size: 0.78rem; }
+  .chrono-who { font-size: 0.75rem; }
 }

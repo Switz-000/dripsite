@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useChronology, useFileTree } from '../hooks/useVault'
 import { wikilinkToSlug } from '../utils/github'
@@ -22,8 +22,35 @@ const GROUPS = [
 const LANES = [['titles', 'Titles'], ['events', 'Wars and events'], ['institutions', 'Institutions']]
 const BIG = 10 ** 6
 
+// Span layout, in CSS pixels. SHADES is how many --span-N colours styles.css
+// offers for successive holders of the same title.
+const SHADES = 6
+const BAR_MIN = 6        // a single year still has to be wide enough to hit
+const LABEL_GAP = 6      // between a bar and the name drawn beside it
+const ROW_GAP = 8        // clear space two neighbours on one row need
+
 function groupOf(kind) {
   return GROUP_OF[kind] || 'events'   // begins/ends, interludes
+}
+
+// Measuring has to happen before the browser paints, or the first frame shows
+// the overlapping labels the layout exists to avoid. There is no DOM during
+// the build-time render, where the effect never runs at all.
+const useMeasureEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+// How wide a name will be painted, in CSS pixels. A canvas measures the same
+// text the browser will; the cache keeps it to one measurement per name.
+let _ctx = null
+const _widths = new Map()
+function labelWidth(s, font) {
+  const key = font + '\u0000' + s
+  const hit = _widths.get(key)
+  if (hit !== undefined) return hit
+  if (!_ctx) _ctx = document.createElement('canvas').getContext('2d')
+  _ctx.font = font
+  const w = _ctx.measureText(s).width
+  _widths.set(key, w)
+  return w
 }
 
 // [[Target|Label]] and *italics* as React nodes
@@ -209,13 +236,95 @@ function Timeline({ events, tree, showCountry }) {
 }
 
 // ── Spans ─────────────────────────────────────────────────────
+// Laying out a lane row is a packing problem: a bar is only as wide as the
+// years it covers, but the name beside it has a fixed width in pixels, so on a
+// long timeline the names of short tenures run straight into each other.
+// layoutRow measures every name, finds it a place (inside the bar, clear of it
+// on either side, or on its own line above), and then packs the bars into as
+// many stacked rows as it takes for nothing to overlap.
+function layoutRow(items, geom, pct, lo, max) {
+  const { px, font, bold } = geom
+  const laid = items.map(s => {
+    const a = pct(s.start ?? lo)
+    const b = pct(s.end ?? max + 1)
+    const left = (a / 100) * px
+    const width = Math.max(((b - a) / 100) * px, BAR_MIN)
+    const label = s.holder || s.label
+    // Before the first measurement there is nothing to measure against, so
+    // every name goes to the right — what the browser would do anyway.
+    let place = 'right'
+    let nameW = 0
+    let offset = 0
+    if (px) {
+      nameW = labelWidth(label, font)
+      if (width >= labelWidth(label, bold) + 14) place = 'inside'
+      else if (left + width + LABEL_GAP + nameW <= px) place = 'right'
+      else if (left - LABEL_GAP - nameW >= 0) place = 'left'
+      else {
+        // Nothing fits beside the bar, which on a phone is most of them:
+        // the name goes above it, pulled back to stay inside the track.
+        place = 'over'
+        offset = Math.max(0, Math.min(left, px - nameW)) - left
+      }
+    }
+    const label0 = place === 'left' ? left - LABEL_GAP - nameW
+      : place === 'over' ? Math.min(left, left + offset)
+      : left
+    const label1 = place === 'right' ? left + width + LABEL_GAP + nameW
+      : place === 'over' ? Math.max(left + width, left + offset + nameW)
+      : left + width
+    return { span: s, a, b, place, offset, from: label0, to: label1 }
+  })
+
+  const stacks = []
+  for (const it of laid) {
+    const row = stacks.find(r => r.to + ROW_GAP <= it.from)
+      || (stacks.push({ to: -BIG, items: [] }), stacks[stacks.length - 1])
+    row.items.push(it)
+    row.to = Math.max(row.to, it.to)
+  }
+  return stacks.map(r => r.items)
+}
+
 function Spans({ spans, groups, country, from, max, tree }) {
+  const wrap = useRef(null)
+  const [geom, setGeom] = useState({ px: 0, font: '', bold: '' })
+
   const laneGroup = { titles: 'people', institutions: 'institutions', events: 'events' }
   const start = from === 'all' ? null : +from
   const rows = spans.filter(s =>
     groups.has(laneGroup[s.lane] || 'events')
     && (country === 'all' || s.country === country)
     && (start === null || (s.end ?? max) >= start))
+
+  // The width of a track, and the font its names are painted in. Read before
+  // the browser paints, so the very first frame is already laid out, and
+  // again whenever the page is resized.
+  useMeasureEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const measure = () => {
+      const track = el.querySelector('.chrono-track')
+      if (!track) return
+      const px = track.getBoundingClientRect().width
+      const cs = getComputedStyle(el.querySelector('.chrono-who') || el)
+      setGeom(prev => {
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+        return prev.px === px && prev.font === font
+          ? prev
+          : { px, font, bold: `${cs.fontStyle} 600 ${cs.fontSize} ${cs.fontFamily}` }
+      })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure)
+      return () => window.removeEventListener('resize', measure)
+    }
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [rows.length])
+
   if (!rows.length) return <p className="chrono-empty">Nothing matches these filters.</p>
 
   const lo = start ?? Math.floor(Math.min(...rows.map(s => s.start ?? max)) / 10) * 10
@@ -225,31 +334,40 @@ function Spans({ spans, groups, country, from, max, tree }) {
   const ticks = []
   for (let y = Math.ceil(lo / step) * step; y <= hi; y += step) ticks.push(y)
 
-  const slugOf = label => (tree ? wikilinkToSlug(label, tree) : null)
+  const slugOf = label => (label && tree ? wikilinkToSlug(label, tree) : null)
 
-  function bar(s, key) {
-    const a = pct(s.start ?? lo)
-    const b = pct(s.end ?? max + 1)
-    const open = s.end == null
+  // One bar. The whole bar is the link to whoever held it, so clicking the
+  // bar and clicking the name beside it both open their article.
+  function bar(it, rowLabel, color, key) {
+    const s = it.span
     const label = s.holder || s.label
-    const slug = slugOf(label)
-    const years = open ? `${s.start} to ?` : s.start === s.end ? `${s.start}` : `${s.start}–${s.end}`
-    const wide = b - a > 16
-    return (
-      <div key={key} className={`chrono-span${open ? ' open' : ''}${wide ? ' inside' : ''}${!wide && b > 80 ? ' flip' : ''}`}
-           style={{ left: `${a}%`, width: `${Math.max(b - a, 0.4)}%` }}
-           title={`${label}, ${years}`}>
-        <span className="chrono-who">
-          {slug && !s.interlude ? <Link to={`/article/${slug}`}>{label}</Link> : <em>{label}</em>}
-        </span>
-      </div>
+    const slug = s.interlude ? null : slugOf(label)
+    const years = s.end == null ? `${s.start} to ?`
+      : s.start === s.end ? `${s.start}`
+      : `${s.start}–${s.end}`
+    const cls = 'chrono-span at-' + it.place
+      + (s.end == null ? ' open' : '')
+      + (s.interlude ? ' interlude' : '')
+    const name = (
+      <span className="chrono-who"
+            style={it.place === 'over' ? { left: `${it.offset}px`, maxWidth: `${geom.px}px` } : undefined}>
+        {s.interlude ? <em>{label}</em> : label}
+      </span>
     )
+    const props = {
+      className: cls,
+      style: { left: `${it.a}%`, width: `${Math.max(it.b - it.a, 0.3)}%`, '--c': color },
+      title: rowLabel && rowLabel !== label ? `${label} — ${rowLabel}, ${years}` : `${label}, ${years}`,
+    }
+    return slug
+      ? <Link key={key} to={`/article/${slug}`} {...props}>{name}</Link>
+      : <div key={key} {...props}>{name}</div>
   }
 
   const grid = <div className="chrono-grid">{ticks.map(y => <i key={y} style={{ left: `${pct(y)}%` }} />)}</div>
 
   return (
-    <div className="chrono-spans">
+    <div className="chrono-spans" ref={wrap}>
       <div className="chrono-saxis">
         <div />
         <div className="chrono-ticks">{ticks.map(y => <span key={y} style={{ left: `${pct(y)}%` }}>{y}</span>)}</div>
@@ -269,16 +387,38 @@ function Spans({ spans, groups, country, from, max, tree }) {
               const items = lane === 'titles'
                 ? ls.filter(s => (s.display || s.title || s.label) === k)
                 : ls.filter(s => s.label === k)
-              const stacks = []
+              // The row's own article: the title as it is written here, or
+              // the canonical title the vault filed these tenures under.
+              const rowSlug = slugOf(k) || slugOf(items[0].title)
+              // Successive holders take the next colour in the palette, so
+              // one tenure is visibly a different person from the next; a
+              // holder who comes back later keeps the colour they had.
+              const shade = new Map()
               for (const s of items) {
-                const row = stacks.find(r => r.end <= (s.start ?? 0)) || (stacks.push({ end: -BIG, items: [] }), stacks[stacks.length - 1])
-                row.items.push(s)
-                row.end = s.end ?? max + 1
+                const who = s.holder || s.label
+                if (!s.interlude && !shade.has(who)) shade.set(who, `var(--span-${shade.size % SHADES})`)
               }
+              // Institutions and wars keep their group's colour from the
+              // filter chips; only titles cycle through holders.
+              const colorOf = s => (s.interlude ? null
+                : lane === 'titles' ? shade.get(s.holder || s.label)
+                : `var(--${lane})`)
+              // A title whose holders did not fit on one row gets several,
+              // with the title written once and a rule down the gutter
+              // holding them together.
+              const stacks = layoutRow(items, geom, pct, lo, max)
               return stacks.map((row, i) => (
-                <div className="chrono-srow" key={k + i}>
-                  <div className="chrono-slabel" title={k}>{i === 0 ? k : ''}</div>
-                  <div className="chrono-track">{grid}{row.items.map((s, j) => bar(s, j))}</div>
+                <div key={k + i}
+                     className={'chrono-srow'
+                       + (stacks.length > 1 ? ' grouped' : '')
+                       + (row.some(it => it.place === 'over') ? ' tall' : '')}>
+                  <div className="chrono-slabel" title={k}>
+                    {i > 0 ? '' : rowSlug ? <Link to={`/article/${rowSlug}`}>{k}</Link> : k}
+                  </div>
+                  <div className="chrono-track">
+                    {grid}
+                    {row.map((it, j) => bar(it, k, colorOf(it.span), j))}
+                  </div>
                 </div>
               ))
             })}
