@@ -178,7 +178,7 @@ export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
     <path d="M${(A.browL[0]-26).toFixed(1)} ${A.browL[1].toFixed(1)} L${(A.browR[0]+26).toFixed(1)} ${A.browR[1].toFixed(1)}" stroke="#d6336c" stroke-width="1" stroke-dasharray="3 3" fill="none"/>
     <path d="M${(200-HEAD.rx*sh.headW*0.8).toFixed(1)} ${A.hat[1].toFixed(1)} L${(200+HEAD.rx*sh.headW*0.8).toFixed(1)} ${A.hat[1].toFixed(1)}" stroke="#d6336c" stroke-width="1" stroke-dasharray="3 3" fill="none"/>
     ${[A.eyeL,A.eyeR,A.browL,A.browR,A.nose,A.mouth,A.cig,A.hat,A.chin].map(a=>dot(...a)).join('')}</g>` : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${frame==='bust' ? `-20 ${(-75-grow).toFixed(1)} 440 484` : '-40 -40 480 770'}" role="img" aria-label="Portrait">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${frame==='face' ? `40 ${(10-grow).toFixed(1)} 320 352` : frame==='bust' ? `-20 ${(-75-grow).toFixed(1)} 440 484` : '-40 -40 480 770'}" role="img" aria-label="Portrait">
   <defs>${headIn}${headOut}<clipPath id="${ID}bodyclip">${bake(`<path d="${BASE.body.d}"/>`, ...BD)}</clipPath></defs>
   ${hairBack}
   ${bake(`<path d="${BASE.legs}" ${ST()} fill="none"/>`, ...about(Math.sqrt(sh.bodyW),1,200,0))}

@@ -39,7 +39,7 @@ export function decoratePeople(html, people) {
   let n = 0
   const badge = (person) => {
     const svg = person.portrait && typeof person.portrait === 'object'
-      ? compose(person.portrait, { id: 'pl' + n++, frame: 'bust' })
+      ? compose(person.portrait, { id: 'pl' + n++, frame: 'face' })
       : ''
     return `<span class="people-portrait${svg ? '' : ' people-portrait-empty'}">${svg}</span>`
   }
