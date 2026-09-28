@@ -1376,7 +1376,7 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .people-item { list-style: none; margin-left: -1.2rem; display: inline-block; vertical-align: top; margin-right: 1.2rem; }
 .people-portrait {
   flex: none;
-  width: 9rem;
+  width: 13rem;
   max-width: 100%;
   aspect-ratio: 4 / 4.4;
   background: var(--bg-surface);
@@ -1388,3 +1388,7 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .people-portrait-empty { opacity: 0.5; }
 tr:has(.people-entry) > td { vertical-align: middle; }
 tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
+
+/* Pages with portrait lists get more room: wider column, smaller margins */
+.page-inner:has(.people-entry) { max-width: 1500px; padding: 24px 20px 60px; }
+.article-body td:has(.people-entry) { padding-top: 8px; padding-bottom: 8px; }
