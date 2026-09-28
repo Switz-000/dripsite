@@ -355,7 +355,9 @@ function layoutRow(items, geom, pct, lo, max, folded) {
   // What each bar takes up on its line: the bar itself, plus the name when
   // the name is what keeps the next bar away — which is never so folded.
   const from = it => (it.place === 'left' && !folded ? it.left - LABEL_GAP - it.nameW : it.left)
-  const to = it => (folded ? it.right
+  // Folded, a bar ends where its years end: a one-year term is drawn a hair
+  // wide, but a term starting that same year still fits on the line after it.
+  const to = it => (folded ? (it.b / 100) * px
     : it.place === 'right' ? it.right + LABEL_GAP + it.nameW
     : it.place === 'over' ? Math.max(it.right, it.left + it.offset + it.nameW)
     : it.right)
@@ -509,16 +511,18 @@ function Spans({ spans, groups, country, from, max, tree }) {
         const ls = rows.filter(s => s.lane === lane).sort((x, y) => (x.start ?? 0) - (y.start ?? 0))
         if (!ls.length) return null
         // Titles get one row per title, holders side by side; overlapping
-        // holders, and interludes, stack underneath.
+        // holders, and interludes, stack underneath. A row is the canonical
+        // title, so a renamed office (a period of the title) stays on one
+        // line; the name in force at the time shows on each bar's tooltip.
         const keys = lane === 'titles'
-          ? [...new Set(ls.map(s => s.display || s.title || s.label))]
+          ? [...new Set(ls.map(s => s.title || s.display || s.label))]
           : ls.map(s => s.label)
         return (
           <div className="chrono-lane" key={lane}>
             <h2>{laneLabel}</h2>
             {keys.map(k => {
               const items = lane === 'titles'
-                ? ls.filter(s => (s.display || s.title || s.label) === k)
+                ? ls.filter(s => (s.title || s.display || s.label) === k)
                 : ls.filter(s => s.label === k)
               // The row's own article: the title as it is written here, or
               // the canonical title the vault filed these tenures under.
@@ -563,7 +567,7 @@ function Spans({ spans, groups, country, from, max, tree }) {
                   </div>
                   <div className="chrono-track">
                     {grid}
-                    {row.map((it, j) => bar(it, k, colorOf(it.span), j))}
+                    {row.map((it, j) => bar(it, it.span.display || k, colorOf(it.span), j))}
                   </div>
                 </div>
               ))
