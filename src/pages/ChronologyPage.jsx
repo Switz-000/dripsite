@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useChronology, useFileTree } from '../hooks/useVault'
 import { wikilinkToSlug } from '../utils/github'
 import { Loading } from '../components/Loading'
@@ -148,7 +148,10 @@ function mergeEvents(events) {
 export default function ChronologyPage() {
   const data = useChronology()
   const { tree } = useFileTree()
-  const [view, setView] = useState('timeline')
+  // The view lives in the URL (/chronology or /chronology/spans), so a reload stays put
+  const navigate = useNavigate()
+  const view = useLocation().pathname.replace(/\/+$/, '').endsWith('/spans') ? 'spans' : 'timeline'
+  const setView = v => navigate(v === 'spans' ? '/chronology/spans' : '/chronology', { replace: true })
   const [groups, setGroups] = useState(() => new Set(GROUPS.map(g => g[0])))
   const [country, setCountry] = useState('all')
   const [from, setFrom] = useState('1900')

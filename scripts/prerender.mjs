@@ -184,6 +184,8 @@ writePage('/404', { title: shellTitle, description: null, data: { tree, flags },
 // markdown is a rendering, the JSON is the data
 if (chronology) {
   writePage('/chronology', { title: shellTitle, description: SITE.description, data: { tree, flags, chronology } })
+  // Same page opened on the Spans view; kept out of the sitemap and search engines as a duplicate
+  writePage('/chronology/spans', { title: shellTitle, description: SITE.description, data: { tree, flags, chronology }, index: false })
 }
 
 // Landing page (out of universe). Written last: it replaces dist/index.html,
