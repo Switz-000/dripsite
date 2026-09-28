@@ -165,8 +165,15 @@ function highestOffice(offices) {
   return [...offices].sort((a, b) => officeRank(b) - officeRank(a))[0]
 }
 
+// The article a title's [[wikilink]] points to, for the quick-stats link
+function officeLink(o) {
+  const m = /\[\[([^\]|#]+)/.exec(o?.title || '')
+  return m ? m[1].trim() : null
+}
+
 function shortOffice(o) {
   return (o.title || '')
+    .replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2')
     .replace(/^Presiding /, 'Pres. ')
     .replace(/^President /, 'Pres. ')
     .replace(/^Member of the General Government of the .*/, 'Gen. Gov.')
@@ -198,6 +205,7 @@ function buildQuickStats(rec) {
       label: titles.length > 1 ? 'Highest office' : 'Office',
       value: `${o.start ?? '?'}–${String(o.end ?? '').slice(-2) || '?'}`,
       sub: shortOffice(o),
+      subLink: officeLink(o),
     })
   }
   const awards = compact(rec.awards)
@@ -279,7 +287,7 @@ function PortraitSection({ rec, name, imageUrl, portrait }) {
 }
 
 // ── Quick stats strip ───────────────────────────────────────────────
-function QuickStatsRow({ stats }) {
+function QuickStatsRow({ stats, wikilinkFn }) {
   return (
     <div className="ibx-qstats" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
       {stats.map((s, i) => (
@@ -289,7 +297,12 @@ function QuickStatsRow({ stats }) {
             {s.value}
             {s.unit && <span className="ibx-qstat-unit">{s.unit}</span>}
           </div>
-          {s.sub && <div className="ibx-qstat-sub">{s.sub}</div>}
+          {s.sub && (() => {
+            const slug = s.subLink && wikilinkFn ? wikilinkFn(s.subLink) : null
+            return <div className="ibx-qstat-sub">
+              {slug ? <Link to={`/article/${slug}`} className="ibx-link">{s.sub}</Link> : s.sub}
+            </div>
+          })()}
         </div>
       ))}
     </div>
@@ -733,7 +746,7 @@ export default function PersonInfobox({ meta, title, imageUrl, wikilinkFn }) {
     <aside className="ibx-person">
       <PortraitSection rec={rec} name={name} imageUrl={imageUrl} portrait={meta?.portrait} />
 
-      {stats.length > 0 && <QuickStatsRow stats={stats} />}
+      {stats.length > 0 && <QuickStatsRow stats={stats} wikilinkFn={wikilinkFn} />}
 
       {tabs.length > 0 && <TabBar tabs={tabs} active={tab} onSelect={setTab} />}
 
