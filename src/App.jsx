@@ -9,6 +9,7 @@ import SearchPage from './pages/SearchPage'
 import NotFoundPage from './pages/NotFoundPage'
 import MapPage from './pages/MapPage'
 import LandingPage from './pages/LandingPage'
+import PortraitsPage from './pages/PortraitsPage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="browse" element={<BrowsePage />} />
         <Route path="chronology" element={<ChronologyPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="dev/portraits" element={<PortraitsPage />} />
         <Route path="*" element={<NotFoundPage />} />
         <Route path="map" element={<MapPage />} />
       </Route>

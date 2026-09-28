@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useFileTree } from '../hooks/useVault'
 import { SITE } from '../config'
+import { useDevTools } from '../hooks/useDevTools'
 
 export default function Layout() {
   const { tree } = useFileTree()
@@ -9,6 +10,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const [devTools, toggleDevTools] = useDevTools()
 
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
@@ -56,6 +58,12 @@ export default function Layout() {
           </div>
           <NavLink to="/map" className={({ isActive }) => isActive ? 'active' : ''}>Map</NavLink>
           <NavLink to="/chronology" className={({ isActive }) => isActive ? 'active' : ''}>Chronology</NavLink>
+          {devTools && (
+            <div className="sidebar-nav-section">
+              <div className="sidebar-nav-label">Dev tools</div>
+              <NavLink to="/dev/portraits" className={({ isActive }) => isActive ? 'active' : ''}>Character Portraits</NavLink>
+            </div>
+          )}
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-label">By Type</div>
             <Link to="/browse?type=person">People</Link>
@@ -74,7 +82,10 @@ export default function Layout() {
         <div className="sidebar-footer">
           {articleCount} articles<br />
           {SITE.footer}<br />
-          <Link to="/" className="sidebar-about">About this project</Link>
+          <Link to="/" className="sidebar-about">About this project</Link><br />
+          <button type="button" className={'devtools-toggle' + (devTools ? ' on' : '')} onClick={toggleDevTools} aria-pressed={devTools}>
+            dev tools
+          </button>
         </div>
       </aside>
 

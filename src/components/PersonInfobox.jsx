@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import Portrait from '../portrait/Portrait'
 
 // ── Wikilink helpers ────────────────────────────────────────────────
 // Parses [[Target]] or [[Target|Display]] or [[Page#Section]]
@@ -244,12 +245,15 @@ function buildTabs(rec) {
 }
 
 // ── Portrait + title overlay ────────────────────────────────────────
-function PortraitSection({ rec, name, imageUrl }) {
+function PortraitSection({ rec, name, imageUrl, portrait }) {
   return (
     <div className="ibx-portrait-head">
-      {imageUrl
-        ? <img src={imageUrl} alt={name} className="ibx-portrait-img" />
-        : <div className="ibx-portrait-placeholder" />
+      {/* a drawn portrait (frontmatter `portrait:`) wins over an image in the article body */}
+      {portrait && typeof portrait === 'object'
+        ? <Portrait spec={portrait} className="ibx-portrait-drawn" />
+        : imageUrl
+          ? <img src={imageUrl} alt={name} className="ibx-portrait-img" />
+          : <div className="ibx-portrait-placeholder" />
       }
       <div className="ibx-title-block">
         <div className="ibx-kicker">{titleKicker(rec)}</div>
@@ -692,7 +696,7 @@ export default function PersonInfobox({ meta, title, imageUrl, wikilinkFn }) {
 
   return (
     <aside className="ibx-person">
-      <PortraitSection rec={rec} name={name} imageUrl={imageUrl} />
+      <PortraitSection rec={rec} name={name} imageUrl={imageUrl} portrait={meta?.portrait} />
 
       {stats.length > 0 && <QuickStatsRow stats={stats} />}
 

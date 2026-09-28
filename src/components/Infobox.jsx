@@ -63,7 +63,7 @@ const DEFAULT_FIELDS = [
 ]
 
 // Fields never shown in infobox (used elsewhere in the UI)
-const SKIP_FIELDS = new Set([
+const SKIP_FIELDS = new Set(['portrait', 
   'type', 'summary',
   'full_name', 'company_name', 'state_name', 'event_name', 'official_name', 'name',
 ])
