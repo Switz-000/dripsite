@@ -2,12 +2,13 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import { getTypeLabel } from '../utils/markdown'
+import Portrait from '../portrait/Portrait'
 
 export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onMouseLeave, onClose }) {
   if (!data) return null
 
   const W = 284
-  const H = 160
+  const H = data.portrait ? 380 : 160
   let left = x + 20
   let top  = y
 
@@ -44,7 +45,9 @@ export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onM
         </div>
       ) : (
         <>
-          {data.imageUrl && (
+          {data.portrait ? (
+            <Portrait spec={data.portrait} frame="face" className="wiki-popup-portrait" />
+          ) : data.imageUrl && (
             <img className="wiki-popup-image" src={data.imageUrl} alt="" loading="lazy" />
           )}
           <div className="wiki-popup-body">

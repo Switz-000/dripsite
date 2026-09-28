@@ -1397,3 +1397,7 @@ tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
 .article-body table:has(.people-entry) { width: 100%; }
 .article-body td:has(.people-entry) { width: 15rem; min-width: 15rem; }
 .article-body td:first-child:not(:has(.people-entry)) { width: 3.5rem; }
+
+/* Person hover card: their drawn portrait at the top */
+.wiki-popup-portrait { background: var(--bg-surface); border-bottom: 1px solid var(--border); }
+.wiki-popup-portrait svg { height: 200px; width: auto; margin: 0 auto; }
