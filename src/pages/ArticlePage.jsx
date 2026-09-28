@@ -86,7 +86,10 @@ export default function ArticlePage() {
   // found, swap the address bar to its canonical slug so every article has
   // exactly one URL. `replace` keeps the old URL out of the back button.
   useEffect(() => {
-    if (!article) return
+    // article.slug is the slug it was loaded for. After back/forward the URL
+    // changes a render before the article does; redirecting on that stale
+    // article bounces between the two pages forever.
+    if (!article || article.slug !== slug) return
     const canonical = pathToSlug(article.path)
     if (slug !== canonical) {
       navigate(`/article/${canonical}${location.hash}`, { replace: true })
