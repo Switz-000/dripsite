@@ -1370,13 +1370,14 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .dp-status { font-size: 0.72rem; color: var(--text-muted); }
 .dp-paste { width: 100%; font-family: var(--font-mono); font-size: 0.7rem; padding: 8px; border: 1px solid var(--border); background: var(--bg); resize: vertical; }
 
-/* Lists that name people: portrait to the left of the name */
-.people-entry { display: flex; align-items: center; gap: 0.7rem; }
-.people-entry-text { min-width: 0; }
-.people-item { list-style: none; margin-left: -1.2rem; }
+/* Lists that name people: big portrait with the name below it */
+.people-entry { display: inline-flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; }
+.people-entry-text { min-width: 0; font-weight: 600; }
+.people-item { list-style: none; margin-left: -1.2rem; display: inline-block; vertical-align: top; margin-right: 1.2rem; }
 .people-portrait {
   flex: none;
-  width: 2.6rem;
+  width: 9rem;
+  max-width: 100%;
   aspect-ratio: 4 / 4.4;
   background: var(--bg-surface);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
@@ -1386,3 +1387,4 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .people-portrait svg { display: block; width: 100%; height: 100%; }
 .people-portrait-empty { opacity: 0.5; }
 tr:has(.people-entry) > td { vertical-align: middle; }
+tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
