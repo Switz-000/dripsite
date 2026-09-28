@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useChronology, useFileTree } from '../hooks/useVault'
+import { useLinkPreview } from '../hooks/useLinkPreview'
+import WikiPopup from '../components/WikiPopup'
 import { wikilinkToSlug } from '../utils/github'
 import { Loading } from '../components/Loading'
 
@@ -152,6 +154,8 @@ export default function ChronologyPage() {
   const navigate = useNavigate()
   const view = useLocation().pathname.replace(/\/+$/, '').endsWith('/spans') ? 'spans' : 'timeline'
   const setView = v => navigate(v === 'spans' ? '/chronology/spans' : '/chronology', { replace: true })
+  const pageRef = useRef(null)
+  const popup = useLinkPreview(pageRef, tree, { selector: 'a[href^="/article/"]', rebind: [data] })
   const [groups, setGroups] = useState(() => new Set(GROUPS.map(g => g[0])))
   const [country, setCountry] = useState('all')
   const [from, setFrom] = useState('1900')
@@ -190,7 +194,8 @@ export default function ChronologyPage() {
   }
 
   return (
-    <div className="page-inner chrono">
+    <>
+    <div className="page-inner chrono" ref={pageRef}>
       <div className="article-type-badge">Index</div>
       <h1 className="article-title">Chronology</h1>
       <p className="chrono-lede">
@@ -233,6 +238,9 @@ export default function ChronologyPage() {
         ? <Timeline events={shown} tree={tree} showCountry={country === 'all'} />
         : <Spans spans={spans} groups={groups} country={country} from={from} max={max} tree={tree} />}
     </div>
+    <WikiPopup data={popup.data} slug={popup.slug} x={popup.x} y={popup.y} visible={popup.visible}
+      onMouseEnter={popup.onMouseEnter} onMouseLeave={popup.onMouseLeave} onClose={popup.onClose} />
+    </>
   )
 }
 
