@@ -875,12 +875,12 @@ a:visited { color: var(--link-visited); }
 /* Lifeline */
 .ibx-lifeline {
   position: relative;
-  padding-left: 44px;
+  padding-left: 54px;
 }
 .ibx-lifeline::before {
   content: '';
   position: absolute;
-  left: 36px;
+  left: 46px;
   top: 8px;
   bottom: 8px;
   width: 1px;
@@ -894,8 +894,8 @@ a:visited { color: var(--link-visited); }
 .ibx-lf-item:first-child { border-top: none; }
 .ibx-lf-year {
   position: absolute;
-  left: -44px;
-  width: 32px;
+  left: -54px;
+  width: 36px;
   top: 7px;
   text-align: right;
   font-family: var(--font-mono);

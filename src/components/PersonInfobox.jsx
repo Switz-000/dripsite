@@ -439,7 +439,7 @@ function CareerPanel({ rec, wikilinkFn }) {
     titles.forEach(t => {
       if (t.start) ev.push({
         year: t.start, kind: 'office',
-        title: t.title || 'Title',
+        title: t.title ? stripWL(String(t.title)) : 'Title',
         span: t.end ? `${t.start}–${t.end}` : `${t.start}–?`,
         location: t.seat ? stripWL(String(t.seat)) : null,
         party: [
@@ -524,7 +524,7 @@ function CareerPanel({ rec, wikilinkFn }) {
           <div className="ibx-section-label">Offices held</div>
           {titles.map((t, i) => (
             <div key={i} className="ibx-office-item">
-              <div className="ibx-office-title">{t.title}</div>
+              <div className="ibx-office-title"><Field value={t.title} wikilinkFn={wikilinkFn} /></div>
               {t.seat && (
                 <div className="ibx-meta"><Field value={t.seat} wikilinkFn={wikilinkFn} /></div>
               )}
