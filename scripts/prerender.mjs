@@ -126,18 +126,37 @@ function writePage(url, { title, description, type = 'website', data, image = SI
   fs.writeFileSync(path.join(DIST, file), html)
 }
 
+// Portraits for the people an article's lists name (see src/utils/peopleLists.js)
+const personCache = new Map()   // slug -> { portrait } | false
+function personAt(slug) {
+  if (!personCache.has(slug)) {
+    const p = bySlug.get(slug)
+    let person = false
+    if (p) {
+      const { meta } = ssr.parseFrontmatter(vault.read(p))
+      if (meta.type === 'person') person = { portrait: meta.portrait && typeof meta.portrait === 'object' ? meta.portrait : null }
+    }
+    personCache.set(slug, person)
+  }
+  return personCache.get(slug)
+}
+function peopleFor(article) {
+  return Object.fromEntries(ssr.candidateSlugs(article.html).map(s => [s, personAt(s)]))
+}
+
 // Articles
 let written = 0
 const failed = []
 for (const [slug, articlePath] of bySlug) {
   try {
     const article = ssr.buildArticle(slug, articlePath, vault.read(articlePath), treeObjects)
+    const people = peopleFor(article)
     writePage(`/article/${slug}`, {
       title: `${article.title} — ${SITE.name}`,   // same format as ArticlePage
       description: describe(article),
       type: 'article',
       image: ssr.infoboxImageOf(article) || ssr.countryFlagOf(article, flagMap) || SITE.image,
-      data: { tree, flags, article },
+      data: { tree, flags, article, people },
     })
     written++
   } catch (e) {
