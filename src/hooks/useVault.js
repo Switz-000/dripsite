@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useReducer } from 'react'
+import { candidateSlugs } from '../utils/peopleLists'
 import {
   getFileTree,
   getFlagMap,
@@ -29,6 +30,7 @@ import { COUNTRIES, STATES, CITIES } from '../data/mapData'
 // Module-level caches — survive re-renders and re-mounts
 export const articleCache = new Map()
 export const metaCache = new Map()   // path -> frontmatter meta (lightweight)
+export const peopleCache = {}       // slug -> { portrait } for a person article, false for anything else
 let treeCache = null
 let treePending = null   // in-flight promise, deduplicated
 let treeFromBuild = false  // true while treeCache is the copy baked into the page
@@ -489,7 +491,8 @@ export function useChronology() {
 // instead of showing a spinner and fetching it again. Called by main.jsx in
 // the browser, and by the prerender in Node before it renders each page.
 // Anything baked in is still refreshed from GitHub in the background.
-export function primeVault({ tree, flags, article, license, chronology } = {}) {
+export function primeVault({ tree, flags, article, license, chronology, people } = {}) {
+  if (people) Object.assign(peopleCache, people)
   if (tree) {
     treeCache = tree.map(path => ({ path, type: 'blob' }))
     treeFromBuild = true
@@ -503,3 +506,30 @@ export function primeVault({ tree, flags, article, license, chronology } = {}) {
 }
 
 export { pathToSlug, slugToPath }
+
+// ── People named in lists ─────────────────────────────────────
+// Who the article's lists name, so their portraits can sit beside them. The
+// build bakes this into the page (people); anything it didn't know about,
+// such as a link added since the last build, is looked up here.
+export function usePeople(html, tree) {
+  const [, refresh] = useReducer(n => n + 1, 0)
+  const slugs = useMemo(() => candidateSlugs(html || ''), [html])
+
+  useEffect(() => {
+    if (!tree) return
+    const missing = slugs.filter(s => !(s in peopleCache))
+    if (!missing.length) return
+    let alive = true
+    Promise.all(missing.map(async slug => {
+      const path = slugToPath(slug, tree)
+      if (!path) { peopleCache[slug] = false; return }
+      try {
+        const meta = await fetchMeta(path)
+        peopleCache[slug] = meta?.type === 'person' ? { portrait: meta.portrait || null } : false
+      } catch { /* leave it unknown; no portrait is fine */ }
+    })).then(() => { if (alive) refresh() })
+    return () => { alive = false }
+  }, [slugs, tree])
+
+  return peopleCache
+}

@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useArticle, useFileTree, useFlags } from '../hooks/useVault'
+import { useArticle, useFileTree, useFlags, usePeople } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
 import { wikilinkToSlug, pathToSlug } from '../utils/github'
 import { infoboxImageOf, countryFlagOf } from '../utils/articleImage'
+import { decoratePeople } from '../utils/peopleLists'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import PersonInfobox from '../components/PersonInfobox'
@@ -18,6 +19,7 @@ export default function ArticlePage() {
   const { article, loading, error } = useArticle(slug)
   const { tree } = useFileTree()
   const flags = useFlags()
+  const people = usePeople(article?.html, tree)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -151,7 +153,7 @@ export default function ArticlePage() {
           ? <PersonInfobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
           : <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} flagUrl={flagUrl} wikilinkFn={wikilinkFn} />
         }
-        <div dangerouslySetInnerHTML={{ __html: article.html }} />
+        <div dangerouslySetInnerHTML={{ __html: decoratePeople(article.html, people) }} />
       </div>
     </div>
 

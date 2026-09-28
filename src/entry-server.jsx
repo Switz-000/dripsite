@@ -20,3 +20,5 @@ export function render(url) {
     </StaticRouter>
   )
 }
+export { candidateSlugs } from './utils/peopleLists'
+export { parseFrontmatter } from './utils/markdown'
