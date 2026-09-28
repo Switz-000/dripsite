@@ -1401,3 +1401,5 @@ tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
 /* Person hover card: their drawn portrait at the top */
 .wiki-popup-portrait { background: var(--bg-surface); border-bottom: 1px solid var(--border); }
 .wiki-popup-portrait svg { height: 200px; width: auto; margin: 0 auto; }
+
+.ibx-qstat-sub::first-letter { text-transform: uppercase; }
