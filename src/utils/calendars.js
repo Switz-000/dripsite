@@ -3,10 +3,11 @@
 // To add a fictional calendar, append an entry to CALENDARS:
 //   id     – stable key (persisted in localStorage)
 //   label  – shown in the dropdown
-//   format(now: Date, tz: string) → { time, day, era, zone }
+//   format(now: Date, tz: string) → { time, year, month, day, zone }
 //     time – e.g. "14:32"
-//     day  – small lead-in, e.g. "Tuesday, 4"
-//     era  – large part (month + year), e.g. "March 2088"
+//     year  – big number/era, e.g. "2088"
+//     month – month (or equivalent) name, e.g. "March"
+//     day   – small line, e.g. "Tuesday, 4"
 //     zone – small caption under the clock
 //
 // The wiki is set in 2088, so the Gregorian calendar keeps the real month,
@@ -39,7 +40,8 @@ function gregorian(now, tz) {
   return {
     time: `${parts.hour}:${parts.minute}`,
     day: `${weekday}, ${day}`,
-    era: `${MONTHS[month - 1]} ${WIKI_YEAR}`,
+    year: String(WIKI_YEAR),
+    month: MONTHS[month - 1],
     zone: tz.replace(/_/g, ' '),
   }
 }

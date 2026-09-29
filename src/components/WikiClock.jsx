@@ -31,20 +31,26 @@ export default function WikiClock() {
   const cal = CALENDARS.find(c => c.id === calId) ?? CALENDARS[0]
   const out = now ? cal.format(now, userTimeZone()) : null
 
+  const blank = '\u00a0'
   return (
     <div className="wiki-clock">
-      <div className="wiki-clock-main">
-        <div className="wiki-clock-time" aria-live="off">{out ? out.time : '--:--'}</div>
-        <div className="wiki-clock-era">{out ? out.era : '\u00a0'}</div>
-        <div className="wiki-clock-date">{out ? out.day : '\u00a0'}</div>
-        <div className="wiki-clock-zone">{out ? out.zone : ' '}</div>
-      </div>
-      <label className="wiki-clock-select">
-        <span>Calendar</span>
-        <select value={calId} onChange={onChange}>
+      <div className="wiki-clock-head">
+        <div className="wiki-clock-live">
+          <span className="wiki-clock-dot" aria-hidden="true" />
+          <span>{out ? out.zone : blank}</span>
+        </div>
+        <select value={calId} onChange={onChange} aria-label="Calendar">
           {CALENDARS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
-      </label>
+      </div>
+      <div className="wiki-clock-body">
+        <div className="wiki-clock-time" aria-live="off">{out ? out.time : '--:--'}</div>
+        <div className="wiki-clock-date">
+          <div className="wiki-clock-year">{out ? out.year : blank}</div>
+          <div className="wiki-clock-month">{out ? out.month : blank}</div>
+          <div className="wiki-clock-day">{out ? out.day : blank}</div>
+        </div>
+      </div>
     </div>
   )
 }
