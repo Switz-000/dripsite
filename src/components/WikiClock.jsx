@@ -35,7 +35,8 @@ export default function WikiClock() {
     <div className="wiki-clock">
       <div className="wiki-clock-main">
         <div className="wiki-clock-time" aria-live="off">{out ? out.time : '--:--'}</div>
-        <div className="wiki-clock-date">{out ? out.date : ' '}</div>
+        <div className="wiki-clock-era">{out ? out.era : '\u00a0'}</div>
+        <div className="wiki-clock-date">{out ? out.day : '\u00a0'}</div>
         <div className="wiki-clock-zone">{out ? out.zone : ' '}</div>
       </div>
       <label className="wiki-clock-select">
