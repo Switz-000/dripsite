@@ -55,15 +55,20 @@ function gregorian(now, tz) {
 }
 
 // ── Dripstanian Standard Calendar (DSC) ──────────────────────
-// Ten months alternating 36/37 days (365 total). In a leap year (every four
-// years) the last month, Verenio, is renamed Verene and gains a day (38).
-// Year 1950 (Gregorian) is AMS, the year Solimao died. Later years are the
-// offset from 1950 in Roman numerals (2000 → L); earlier ones are the offset
-// in Arabic numerals + "AS" (1770 → 180 AS).
+// Ten months alternating 36/37 days (365 total). Every fourth DSC year is a
+// leap year: the last month, Verenio, is renamed Verene and gains a day (38).
+// There is no century correction, so the DSC slowly drifts against the
+// Gregorian calendar (~1 day per 128 years). That is intentional.
 //
-// Assumption: the DSC year starts on 1 January, so the day of the (leap) year
-// maps straight onto the months below. 2088 is a leap year, hence Verene.
+// DSC year 0 is AMS (Gregorian 1950, the year Solimao died). Later years are
+// Roman numerals (2000 → L); earlier ones are Arabic + "AS" (1770 → 180 AS).
+//
+// Anchor: DSC year 138 (CXXXVIII) begins on 1 January of the wiki year (2088).
+// The clock keeps the real month/day, so it counts the days elapsed since
+// that anchor and walks them through DSC years; a 365-day year 138 therefore
+// ends one day before Gregorian 2088 does.
 const DSC_EPOCH = 1950
+const DSC_ANCHOR_YEAR = WIKI_YEAR - DSC_EPOCH // 138
 const DSC_MONTHS = [
   { name: 'Theosio', days: 36 }, { name: 'Olodio', days: 37 },
   { name: 'Vartelio', days: 36 }, { name: 'Boralio', days: 37 },
@@ -73,7 +78,8 @@ const DSC_MONTHS = [
 ]
 const LEAP_MONTH = { name: 'Verene', days: 38 }
 
-const isLeap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+const isDscLeap = y => y % 4 === 0
+const dscYearLength = y => (isDscLeap(y) ? 366 : 365)
 
 export function toRoman(n) {
   const map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
@@ -83,16 +89,16 @@ export function toRoman(n) {
   return out
 }
 
-export function dscYearLabel(gYear) {
-  const d = gYear - DSC_EPOCH
-  if (d === 0) return 'AMS'
-  return d > 0 ? toRoman(d) : `${-d} AS`
+// y is a DSC year number (0 = AMS, negative = before Solimao).
+export function dscYearLabel(y) {
+  if (y === 0) return 'AMS'
+  return y > 0 ? toRoman(y) : `${-y} AS`
 }
 
-// dayOfYear is 1-based in a year of the given length.
-export function dscDate(gYear, dayOfYear) {
+// dayOfYear is 1-based within DSC year y.
+export function dscDate(y, dayOfYear) {
   const months = DSC_MONTHS.map((m, i) =>
-    i === DSC_MONTHS.length - 1 && isLeap(gYear) ? LEAP_MONTH : m)
+    i === DSC_MONTHS.length - 1 && isDscLeap(y) ? LEAP_MONTH : m)
   let left = dayOfYear
   for (const m of months) {
     if (left <= m.days) return { name: m.name, day: left, length: m.days }
@@ -102,13 +108,21 @@ export function dscDate(gYear, dayOfYear) {
   return { name: last.name, day: last.days, length: last.days }
 }
 
+// daysSinceAnchor is 0 on 1 Jan of the anchor year.
+export function dscFromAnchorDays(daysSinceAnchor) {
+  let y = DSC_ANCHOR_YEAR
+  let left = daysSinceAnchor
+  while (left >= dscYearLength(y)) { left -= dscYearLength(y); y++ }
+  return { year: y, ...dscDate(y, left + 1) }
+}
+
 function dsc(now, tz) {
   const { month, day, time } = localParts(now, tz)
-  const doy = Math.round((Date.UTC(WIKI_YEAR, month - 1, day) - Date.UTC(WIKI_YEAR, 0, 1)) / 86400000) + 1
-  const d = dscDate(WIKI_YEAR, doy)
+  const elapsed = Math.round((Date.UTC(WIKI_YEAR, month - 1, day) - Date.UTC(WIKI_YEAR, 0, 1)) / 86400000)
+  const d = dscFromAnchorDays(elapsed)
   return {
     time,
-    year: dscYearLabel(WIKI_YEAR),
+    year: dscYearLabel(d.year),
     month: d.name,
     day: `Day ${d.day} of ${d.length}`,
     zone: tz.replace(/_/g, ' '),
