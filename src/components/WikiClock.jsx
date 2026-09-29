@@ -45,7 +45,7 @@ export default function WikiClock() {
       </div>
       <div className="wiki-clock-body">
         <div className="wiki-clock-date">
-          <div className="wiki-clock-year">{out ? out.year : blank}</div>
+          <div className={`wiki-clock-year${out && out.year.length > 5 ? ' long' : ''}`}>{out ? out.year : blank}</div>
           <div className="wiki-clock-month">{out ? out.month : blank}</div>
           <div className="wiki-clock-day">{out ? out.day : blank}</div>
         </div>

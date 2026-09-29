@@ -255,6 +255,7 @@ a:visited { color: var(--link-visited); }
 .wiki-clock-date { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .wiki-clock-month { order: 1; margin: 0 0 8px; font-family: var(--font-ui); font-size: clamp(0.9rem, 4vw, 1.1rem); font-weight: 600; letter-spacing: 0.32em; text-indent: 0.32em; text-transform: uppercase; color: var(--text-primary); line-height: 1.1; }
 .wiki-clock-year { order: 2; font-family: var(--font-display); font-size: clamp(4.4rem, 25vw, 7.5rem); font-weight: 700; line-height: 0.9; letter-spacing: -0.02em; color: var(--text-accent); }
+.wiki-clock-year.long { font-size: clamp(2.2rem, 11vw, 4.2rem); line-height: 1; padding: 0.1em 0; }
 .wiki-clock-day { order: 3; margin-top: 10px; font-family: var(--font-ui); font-size: 0.75rem; color: var(--text-muted); line-height: 1.2; }
 .wiki-clock-time { font-family: var(--font-mono); font-size: clamp(1.6rem, 7vw, 2.2rem); font-weight: 500; letter-spacing: 0.02em; line-height: 1; padding: 10px 22px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
