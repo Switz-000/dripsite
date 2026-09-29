@@ -41,14 +41,16 @@ export default function WavingFlag({ src, name }) {
     if (!canvas) return
     const W = 64, H = 50           // canvas size, css px
     const FW = 54, FH = 36         // flag box inside it
-    const X0 = 2, Y0 = 6, AMP = 4  // pole offset, top margin, vertical swing
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3)
-    canvas.width = Math.round(W * dpr)
-    canvas.height = Math.round(H * dpr)
+    const X0 = 2, Y0 = 3, AMP = 4  // pole offset, top margin, vertical swing
+    // Deliberately low-res: one canvas pixel = PIXEL css px, scaled up crisp,
+    // for a chunky pixel-art look.
+    const PIXEL = 1.5
+    canvas.width = Math.round(W / PIXEL)
+    canvas.height = Math.round(H / PIXEL)
     canvas.style.width = `${W}px`
     canvas.style.height = `${H}px`
 
-    const gl = canvas.getContext('webgl', { antialias: true, alpha: true, premultipliedAlpha: true })
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: true, premultipliedAlpha: true })
     if (!gl) { setFallback(true); return }
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 

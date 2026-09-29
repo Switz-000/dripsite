@@ -266,9 +266,9 @@ a:visited { color: var(--link-visited); }
 .wiki-clock-holiday { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--holiday, var(--text-accent)) 14%, transparent); }
 .wiki-clock-holiday-name { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
 .wiki-clock-holiday-country { font-family: var(--font-ui); font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
-.waving-flag { display: flex; align-items: flex-start; flex: none; }
-.waving-flag-pole { width: 2px; height: 48px; background: var(--border-strong); border-radius: 1px; margin-top: 4px; margin-right: -2px; z-index: 1; }
-.waving-flag canvas { display: block; }
+.waving-flag { position: relative; flex: none; width: 64px; height: 50px; }
+.waving-flag-pole { position: absolute; left: 0; top: 5px; width: 2px; height: 40px; background: var(--border-strong); border-radius: 1px; z-index: 1; }
+.waving-flag canvas { display: block; image-rendering: pixelated; }
 .waving-flag-static { width: 54px; height: auto; margin: 10px 0 0 2px; }
 
 .home-categories h2 { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
