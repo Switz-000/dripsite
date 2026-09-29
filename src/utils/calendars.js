@@ -10,10 +10,14 @@
 //     day   – small line, e.g. "Tuesday, 4"
 //     zone – small caption under the clock
 //
-// The wiki is set in 2088, so the Gregorian calendar keeps the real month,
-// day and time of day but always shows the year 2088.
+// The wiki is set 62 years ahead of the real calendar: real 2026 is 2088,
+// real 2027 is 2089, and so on. The real month, day and time of day are kept,
+// and the year keeps advancing with real time, so leap days and the DSC's
+// own drift actually play out year after year.
 
+// Wiki year 2088 = real year 2026 (the year this clock was built).
 export const WIKI_YEAR = 2088
+const WIKI_OFFSET = WIKI_YEAR - 2026
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -28,28 +32,29 @@ export function userTimeZone() {
 }
 
 // Wall-clock parts of `now` in the viewer's timezone. Only month/day/time are
-// real; the year is always WIKI_YEAR.
+// real; the year is the real year plus WIKI_OFFSET.
 function localParts(now, tz) {
   const parts = {}
   for (const p of new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz, month: 'numeric', day: 'numeric',
+    timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(now)) parts[p.type] = p.value
-  return {
-    month: Number(parts.month),
-    day: Number(parts.day),
-    time: `${parts.hour}:${parts.minute}`,
-  }
+  const year = Number(parts.year) + WIKI_OFFSET
+  const month = Number(parts.month)
+  // A real 29 Feb lands in a non-leap wiki year (the shift is 2 mod 4);
+  // clamp it (for display too) so it doesn't roll into March.
+  const calcDay = Math.min(Number(parts.day), new Date(Date.UTC(year, month, 0)).getUTCDate())
+  return { year, month, day: Number(parts.day), calcDay, time: `${parts.hour}:${parts.minute}` }
 }
 
 function gregorian(now, tz) {
-  const { month, day, time } = localParts(now, tz)
-  const weekday = WEEKDAYS[new Date(Date.UTC(WIKI_YEAR, month - 1, day)).getUTCDay()]
+  const { year, month, calcDay, time } = localParts(now, tz)
+  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, calcDay)).getUTCDay()]
   return {
     time,
-    year: String(WIKI_YEAR),
+    year: String(year),
     month: MONTHS[month - 1],
-    day: `${weekday}, ${day}`,
+    day: `${weekday}, ${calcDay}`,
     zone: tz.replace(/_/g, ' '),
   }
 }
@@ -63,10 +68,10 @@ function gregorian(now, tz) {
 // DSC year 0 is AMS (Gregorian 1950, the year Solimao died). Later years are
 // Roman numerals (2000 → L); earlier ones are Arabic + "AS" (1770 → 180 AS).
 //
-// Anchor: DSC year 138 (CXXXVIII) begins on 1 January of the wiki year (2088).
-// The clock keeps the real month/day, so it counts the days elapsed since
-// that anchor and walks them through DSC years; a 365-day year 138 therefore
-// ends one day before Gregorian 2088 does.
+// Anchor: DSC year 138 (CXXXVIII) begins on Gregorian 1 January 2088. The
+// clock counts the real days elapsed since then and walks them through DSC
+// years, so it drifts against the Gregorian calendar as time passes (year 138
+// has 365 days, one fewer than Gregorian 2088).
 const DSC_EPOCH = 1950
 const DSC_ANCHOR_YEAR = WIKI_YEAR - DSC_EPOCH // 138
 const DSC_MONTHS = [
@@ -117,8 +122,8 @@ export function dscFromAnchorDays(daysSinceAnchor) {
 }
 
 function dsc(now, tz) {
-  const { month, day, time } = localParts(now, tz)
-  const elapsed = Math.round((Date.UTC(WIKI_YEAR, month - 1, day) - Date.UTC(WIKI_YEAR, 0, 1)) / 86400000)
+  const { year, month, calcDay, time } = localParts(now, tz)
+  const elapsed = Math.round((Date.UTC(year, month - 1, calcDay) - Date.UTC(WIKI_YEAR, 0, 1)) / 86400000)
   const d = dscFromAnchorDays(elapsed)
   return {
     time,
