@@ -259,6 +259,20 @@ a:visited { color: var(--link-visited); }
 .wiki-clock-day { order: 3; margin-top: 10px; font-family: var(--font-ui); font-size: 0.75rem; color: var(--text-muted); line-height: 1.2; }
 .wiki-clock-time { font-family: var(--font-mono); font-size: clamp(1.6rem, 7vw, 2.2rem); font-weight: 500; letter-spacing: 0.02em; line-height: 1; padding: 10px 22px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
+/* ── Holidays ── */
+.wiki-clock { position: relative; overflow: hidden; }
+.wiki-clock > *:not(.holiday-confetti) { position: relative; z-index: 1; }
+.holiday-confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2 !important; }
+.wiki-clock-holiday { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--holiday, var(--text-accent)) 14%, transparent); }
+.wiki-clock-holiday-name { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.wiki-clock-holiday-country { font-family: var(--font-ui); font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+.waving-flag { display: flex; align-items: flex-start; flex: none; }
+.waving-flag-pole { width: 2px; height: 40px; background: var(--border-strong); border-radius: 1px; }
+.waving-flag-cloth { display: flex; width: 52px; height: 34px; margin-top: 2px; }
+.waving-flag-cloth span { flex: 1; height: 100%; animation: flag-wave 1.4s ease-in-out infinite; margin-right: -0.4px; }
+@keyframes flag-wave { 0%, 100% { transform: translateY(-2.5px); filter: brightness(1.08); } 50% { transform: translateY(2.5px); filter: brightness(.9); } }
+@media (prefers-reduced-motion: reduce) { .waving-flag-cloth span { animation: none; } }
+
 .home-categories h2 { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
 .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 32px; }
 .category-card { display: block; background: var(--bg-surface); border: 1px solid var(--border); padding: 13px 14px; transition: border-color var(--transition), background var(--transition); text-decoration: none; }

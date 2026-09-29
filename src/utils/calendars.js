@@ -101,11 +101,11 @@ export function dscDate(y, dayOfYear) {
     i === DSC_MONTHS.length - 1 && isDscLeap(y) ? LEAP_MONTH : m)
   let left = dayOfYear
   for (const m of months) {
-    if (left <= m.days) return { name: m.name, day: left, length: m.days }
+    if (left <= m.days) return { index: months.indexOf(m), name: m.name, day: left, length: m.days }
     left -= m.days
   }
   const last = months[months.length - 1]
-  return { name: last.name, day: last.days, length: last.days }
+  return { index: months.length - 1, name: last.name, day: last.days, length: last.days }
 }
 
 // daysSinceAnchor is 0 on 1 Jan of the anchor year.
@@ -116,12 +116,18 @@ export function dscFromAnchorDays(daysSinceAnchor) {
   return { year: y, ...dscDate(y, left + 1) }
 }
 
-function dsc(now, tz) {
+// Current DSC date (year number, 0-based month index, day). Holidays are
+// defined against this whichever calendar the viewer has selected.
+export function dscToday(now, tz = userTimeZone()) {
   const { month, day, time } = localParts(now, tz)
   const elapsed = Math.round((Date.UTC(WIKI_YEAR, month - 1, day) - Date.UTC(WIKI_YEAR, 0, 1)) / 86400000)
-  const d = dscFromAnchorDays(elapsed)
+  return { ...dscFromAnchorDays(elapsed), time }
+}
+
+function dsc(now, tz) {
+  const d = dscToday(now, tz)
   return {
-    time,
+    time: d.time,
     year: dscYearLabel(d.year),
     month: d.name,
     day: `Day ${d.day} of ${d.length}`,

@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { CALENDARS, DEFAULT_CALENDAR, userTimeZone } from '../utils/calendars'
+import { CALENDARS, DEFAULT_CALENDAR, userTimeZone, dscToday } from '../utils/calendars'
+import { holidayFor } from '../data/holidays'
+import { useFlags } from '../hooks/useVault'
+import { flagUrlFor } from '../utils/github'
+import { flagPalette } from '../utils/flagColors'
+import { WavingFlag, Confetti } from './HolidayEffects'
 
 const STORAGE_KEY = 'dripwiki.calendar'
 
@@ -23,6 +28,25 @@ export default function WikiClock() {
     return () => clearInterval(t)
   }, [])
 
+  // Today's holiday, if any. ?holiday=<Country> previews the effect.
+  const flags = useFlags()
+  const [preview, setPreview] = useState(null)
+  useEffect(() => {
+    setPreview(new URLSearchParams(window.location.search).get('holiday'))
+  }, [])
+  const holiday = preview
+    ? { name: 'Holiday preview', country: preview }
+    : now ? holidayFor(dscToday(now, userTimeZone())) : null
+  const flagSrc = holiday ? flagUrlFor(holiday.country, flags) : null
+  const [palette, setPalette] = useState(null)
+  useEffect(() => {
+    setPalette(null)
+    if (!flagSrc) return
+    let alive = true
+    flagPalette(flagSrc).then(p => { if (alive) setPalette(p) })
+    return () => { alive = false }
+  }, [flagSrc])
+
   const onChange = e => {
     setCalId(e.target.value)
     try { localStorage.setItem(STORAGE_KEY, e.target.value) } catch { /* ignore */ }
@@ -33,7 +57,8 @@ export default function WikiClock() {
 
   const blank = '\u00a0'
   return (
-    <div className="wiki-clock">
+    <div className={`wiki-clock${flagSrc ? ' is-holiday' : ''}`}>
+      {flagSrc && palette && <Confetti colors={palette} />}
       <div className="wiki-clock-head">
         <div className="wiki-clock-live">
           <span className="wiki-clock-dot" aria-hidden="true" />
@@ -43,6 +68,15 @@ export default function WikiClock() {
           {CALENDARS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
       </div>
+      {flagSrc && (
+        <div className="wiki-clock-holiday" style={palette ? { '--holiday': palette[0] } : undefined}>
+          <WavingFlag src={flagSrc} name={holiday.country} />
+          <div>
+            <div className="wiki-clock-holiday-name">{holiday.name}</div>
+            <div className="wiki-clock-holiday-country">{holiday.country}</div>
+          </div>
+        </div>
+      )}
       <div className="wiki-clock-body">
         <div className="wiki-clock-date">
           <div className={`wiki-clock-year${out && out.year.length > 5 ? ' long' : ''}`}>{out ? out.year : blank}</div>
