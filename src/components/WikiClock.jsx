@@ -44,12 +44,12 @@ export default function WikiClock() {
         </select>
       </div>
       <div className="wiki-clock-body">
-        <div className="wiki-clock-time" aria-live="off">{out ? out.time : '--:--'}</div>
         <div className="wiki-clock-date">
           <div className="wiki-clock-year">{out ? out.year : blank}</div>
           <div className="wiki-clock-month">{out ? out.month : blank}</div>
           <div className="wiki-clock-day">{out ? out.day : blank}</div>
         </div>
+        <div className="wiki-clock-time" aria-live="off">{out ? out.time : '--:--'}</div>
       </div>
     </div>
   )
