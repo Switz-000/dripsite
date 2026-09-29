@@ -4,7 +4,8 @@ import { holidayFor } from '../data/holidays'
 import { useFlags } from '../hooks/useVault'
 import { flagUrlFor } from '../utils/github'
 import { flagPalette } from '../utils/flagColors'
-import { WavingFlag, Confetti } from './HolidayEffects'
+import { Confetti } from './HolidayEffects'
+import WavingFlag from './WavingFlag'
 
 const STORAGE_KEY = 'dripwiki.calendar'
 
