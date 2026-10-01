@@ -36,11 +36,28 @@ export async function loadVault() {
 
 async function download(dir) {
   const { owner, repo, branch } = REPO_CONFIG
-  const url = process.env.VAULT_TARBALL_URL ||
-    `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.tar.gz`
+  // GitHub's archive endpoint sometimes answers 502/504 for a moment, so try
+  // it a few times, then the codeload mirror it redirects to anyway
+  const urls = process.env.VAULT_TARBALL_URL
+    ? [process.env.VAULT_TARBALL_URL]
+    : [
+        `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.tar.gz`,
+        `https://codeload.github.com/${owner}/${repo}/tar.gz/refs/heads/${branch}`,
+      ]
 
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Vault download failed (${res.status}): ${url}`)
+  let res, lastError
+  for (let attempt = 0; attempt < 6 && !res; attempt++) {
+    const url = urls[attempt % urls.length]
+    if (attempt) await new Promise(r => setTimeout(r, 2000 * attempt))
+    try {
+      const r = await fetch(url)
+      if (r.ok) res = r
+      else lastError = new Error(`Vault download failed (${r.status}): ${url}`)
+      if (!r.ok && r.status >= 400 && r.status < 500 && r.status !== 429) break   // not transient
+    } catch (e) { lastError = e }
+    if (!res) console.warn(`vault: attempt ${attempt + 1} failed (${lastError.message})`)
+  }
+  if (!res) throw lastError
 
   const archive = path.join(os.tmpdir(), `${repo}-${Date.now()}.tar.gz`)
   fs.writeFileSync(archive, Buffer.from(await res.arrayBuffer()))

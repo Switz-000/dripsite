@@ -118,6 +118,8 @@ const NOSES = Object.fromEntries(Object.entries(BASE.noses).map(([n,o])=>[n,(x,y
 const HAIRS = { none:null, ...BASE.hair };
 const FACIAL = BASE.facial;
 export const MULTI = ['extras','facial'];
+/* a face carries one of these at most; the page lists them as their own "Mustache" part */
+export const STACHE = ['mustache','brush'];
 const EXTRA_GREY = '#c4c4c4';   // wrinkles and marks read as shading, not ink
 /* outlines of hair are a darker shade of the hair itself, never black */
 const shade = (hex, k=0.62) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.slice(i,i+2),16)*k).toString(16).padStart(2,'0')).join('');
@@ -131,12 +133,17 @@ export const SHAPES = [
 export const COLORS = ['skin','hair','facial','frames','outfit','suit','shirt','tie'];
 /* sampled from Martín's chart of Susian leaders (1978-2009) */
 export const SWATCHES = {
-  hair:   [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3']],
-  facial: [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3']],
-  suit:   [['Serec','#09135e'],['Nozeslawna','#02051a'],['Razol, Tessan','#0c0c0c'],['Lasmanna','#333333']],
-  shirt:  [['Serec, Lasmanna','#ceedf4'],['Razol, Tessan','#ebebeb']],
-  tie:    [['Serec','#ed1c24'],['Tessan','#c40005'],['Razol','#00a2e8']],
-  frames: [['Razol','#5b4900']]
+  skin:   [['White','#ffffff']],
+  hair:   [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3'],
+           ['Black','#141210'],['Chestnut','#6b4a2e'],['Blonde','#e2c275'],['Ginger','#b5532a'],['White','#f2f2f2'],['Slate','#7a808a']],
+  facial: [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3'],
+           ['Black','#141210'],['Chestnut','#6b4a2e'],['Blonde','#e2c275'],['Ginger','#b5532a'],['White','#f2f2f2'],['Slate','#7a808a']],
+  outfit: [['White','#ffffff'],['Light grey','#d9d9d9'],['Sand','#d8c7a3'],['Olive','#5b6b3a'],['Rust','#a4452c'],['Teal','#1f6f78'],['Plum','#5b2a52'],['Charcoal','#2b2b2b']],
+  suit:   [['Serec','#09135e'],['Nozeslawna','#02051a'],['Razol, Tessan','#0c0c0c'],['Lasmanna','#333333'],
+           ['Brown','#4a3322'],['Burgundy','#4e0f1c'],['Forest','#12301f'],['Slate','#3c4656'],['Beige','#b8a98a'],['Light grey','#8f949c']],
+  shirt:  [['Serec, Lasmanna','#ceedf4'],['Razol, Tessan','#ebebeb'],['Cream','#f6ecd2'],['Pale pink','#f4d6d8'],['Mint','#d4eedd'],['Lavender','#dcd6f0'],['Sky','#a9cbe8'],['Black','#161616']],
+  tie:    [['Serec','#ed1c24'],['Tessan','#c40005'],['Razol','#00a2e8'],['Navy','#10205e'],['Gold','#d9a521'],['Green','#1f7a3d'],['Purple','#6a2c91'],['Black','#111111'],['Orange','#e8731a'],['Grey','#8a8a8a']],
+  frames: [['Razol','#5b4900'],['Black','#111111'],['Tortoise','#6a3b17'],['Silver','#b9bec6'],['Gold','#c9a227'],['Red','#a3202a'],['Blue','#254a9c']]
 };
 export const DEFAULT_SPEC = { outfit:'none', brows:'none', eyes:'dot', eyeliner:'none', nose:'hook', mouth:'line', hair:'none', eyewear:'none', extras:[], facial:[], shape:{headW:1,headH:1,bodyW:1,bodyH:1}, palette:{skin:'#ffffff', hair:'#6b4a2e', facial:'#6b4a2e', frames:'#41230a', outfit:'#ffffff', suit:'#09135e', shirt:'#ceedf4', tie:'#ed1c24'} };
 
@@ -230,6 +237,7 @@ export function normalizeSpec(raw){
       // the site's frontmatter reader keeps `[a, b]` as a string, so accept both forms
       const v = Array.isArray(r[k]) ? r[k] : (typeof r[k] === 'string' ? r[k].replace(/^\s*\[|\]\s*$/g, '').split(',') : []);
       s[k] = v.map(x => String(x).trim()).filter(x => opts.includes(x));
+      if (k === 'facial') { const i = s[k].findIndex(x => STACHE.includes(x)); s[k] = s[k].filter((x, j) => !STACHE.includes(x) || j === i) }
     } else if (r[k] != null) {
       const v = String(r[k]).trim();
       if (opts.includes(v)) s[k] = v;
