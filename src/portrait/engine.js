@@ -98,14 +98,14 @@ function wob(pts, closed=true, amp=1.0, seed=1){
 }
 const SUIT = (p, withTie=true, ID='') => { const T=TORSO_TOP, J=[200,T+95], mir=pts=>pts.map(([x,y])=>[400-x,y]);
   const lapel=[[171,T-6],[159,T+12],[154,T+27],[164,T+32],[149,T+53],J];            // both lapels end on the same point, where the seam starts
-  const V=wob([[166,T-12],[234,T-12],[200,T+90]],true,0.8,3);                         // the tie only shows inside the shirt V: tucked in
+  const V=wob([[166,T-12],[234,T-12],[200,T+90]],true,0.8,3);                         // the tie sits inside the shirt V and stops short of its tip: tucked in
   const thin=c=>`stroke="${shade(c)}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"`;
   return `<path d="${BASE.body.d}" fill="${p.suit}"/>
     <g clip-path="url(#${ID}bodyclip)">
       <clipPath id="${ID}shirtclip"><path d="${V}"/></clipPath>
       <path d="${V}" fill="${p.shirt}"/>
       ${withTie ? `<g clip-path="url(#${ID}shirtclip)">
-        <path d="${wob([[197,T+12],[203,T+12],[210,T+60],[205,T+110],[195,T+110],[190,T+60]],true,0.6,7)}" fill="${p.tie}" ${thin(p.tie)}/>
+        <path d="${wob([[197,T+12],[203,T+12],[207,T+38],[204,T+60],[200,T+80],[196,T+60],[193,T+38]],true,0.35,7)}" fill="${p.tie}" ${thin(p.tie)}/>
         <path d="${wob([[191,T+3],[209,T+3],[200,T+19]],true,0.4,5)}" fill="${p.tie}" ${thin(p.tie)}/>
       </g>` : ''}
       <path d="${wob(lapel,true,0.9,11)}" fill="${p.suit}" ${thin(p.suit)}/>
