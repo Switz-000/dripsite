@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { useFileTree, pathToSlug } from '../hooks/useVault'
 import { Loading } from '../components/Loading'
+import WikiClock from '../components/WikiClock'
 import { HOME, HOME_STATS, FEATURED_ARTICLES, HOME_CATEGORIES } from '../config'
 
 function renderTitle(title) {
@@ -34,6 +35,8 @@ export default function HomePage() {
           {articleCount > 0 && <> {articleCount.toLocaleString()} articles indexed.</>}
         </p>
       </div>
+
+      <WikiClock />
 
       {loading ? (
         <Loading message="Loading index..." />
