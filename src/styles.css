@@ -1362,11 +1362,19 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .devtools-toggle.on { opacity: 1; color: var(--text-accent); }
 
 .dp-lede { font-family: var(--font-body); color: var(--text-secondary); margin: 8px 0 20px; max-width: 60ch; }
-.dp-grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.dp-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 900px) { .dp-grid { grid-template-columns: 1fr; } }
 .dp-stagecol { display: grid; gap: 10px; position: sticky; top: 16px; }
 @media (max-width: 900px) { .dp-stagecol { position: static; } }
-.dp-stages { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dp-stages { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .dp-stages { grid-template-columns: 1fr; } }
+.dp-select { position: relative; }
+.dp-selbtn { display: flex; justify-content: space-between; gap: 8px; width: 100%; max-width: 260px; font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-primary); cursor: pointer; text-align: left; }
+.dp-menu { position: absolute; z-index: 20; top: 100%; left: 0; min-width: 100%; max-height: 260px; overflow-y: auto; margin: 2px 0 0; padding: 4px 0; list-style: none; background: var(--bg-surface); border: 1px solid var(--border-strong); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.dp-opt { display: flex; gap: 6px; width: 100%; font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 12px; border: 0; background: none; color: var(--text-primary); cursor: pointer; text-align: left; }
+.dp-opt:hover, .dp-opt:focus-visible { background: var(--text-primary); color: var(--bg-surface); outline: none; }
+.dp-opt.on { font-weight: 700; }
+.dp-tick { width: 1em; }
 .dp-stage { margin: 0; background: var(--bg-surface); border: 1px solid var(--border); padding: 8px; display: grid; gap: 6px; align-content: start; }
 .dp-stage figcaption { font-family: var(--font-ui); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
 .dp-ibx { border: 1px solid var(--border-strong); background: var(--bg-surface); aspect-ratio: 4 / 4.4; overflow: hidden; }

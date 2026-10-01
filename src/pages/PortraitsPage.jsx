@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Portrait from '../portrait/Portrait'
 import { DEFAULT_SPEC, SLOT_OPTIONS, SLOT_ORDER, MULTI, SHAPES, COLORS, SWATCHES, normalizeSpec, toYaml } from '../portrait/engine'
 import { parseFrontmatter } from '../utils/markdown'
@@ -8,12 +8,65 @@ import { parseFrontmatter } from '../utils/markdown'
 const LABELS = { eyes: 'Eyes', eyeliner: 'Eyeliner', brows: 'Brows', nose: 'Nose', mouth: 'Mouth', hair: 'Hair',
   facial: 'Facial hair', eyewear: 'Eyewear', outfit: 'Outfit', extras: 'Extras' }
 
+const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+// Dropdown whose options preview on hover: onPreview(opt) while an option is
+// under the pointer or keyboard focus, onPreview(null) when it leaves.
+function PartSelect({ slot, spec, onPick, onPreview }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const multi = MULTI.includes(slot)
+  const value = spec[slot]
+  const label = multi ? (value.length ? value.join(', ') : 'none') : value
+  const isOn = (opt) => (multi ? value.includes(opt) : value === opt)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e) => { if (ref.current && !ref.current.contains(e.target)) close() }
+    const esc = (e) => { if (e.key === 'Escape') close() }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc) }
+  }, [open])
+
+  function close() { setOpen(false); onPreview(null) }
+  function choose(opt) { onPick(opt); if (!multi) close() }
+
+  return (
+    <div className="dp-select" ref={ref}>
+      <button type="button" className="dp-selbtn" aria-haspopup="listbox" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>
+        <span>{label}</span><span aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <ul className="dp-menu" role="listbox" aria-multiselectable={multi} onMouseLeave={() => onPreview(null)}>
+          {SLOT_OPTIONS[slot].map(opt => (
+            <li key={opt}>
+              <button type="button" role="option" aria-selected={isOn(opt)} className={'dp-opt' + (isOn(opt) ? ' on' : '')}
+                onMouseEnter={() => onPreview(opt)} onFocus={() => onPreview(opt)} onClick={() => choose(opt)}>
+                {multi && <span className="dp-tick" aria-hidden="true">{isOn(opt) ? '✓' : ''}</span>}{opt}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function PortraitsPage() {
   const [spec, setSpec] = useState(() => normalizeSpec(DEFAULT_SPEC))
+  const [hover, setHover] = useState(null) // { slot, opt } while previewing an option
   const [anchors, setAnchors] = useState(false)
   const [status, setStatus] = useState('')
   const [pasted, setPasted] = useState('')
   const yaml = useMemo(() => toYaml(spec), [spec])
+  const shown = useMemo(() => {
+    if (!hover) return spec
+    const { slot, opt } = hover
+    if (!MULTI.includes(slot)) return { ...spec, [slot]: opt }
+    const cur = spec[slot]
+    return { ...spec, [slot]: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] }
+  }, [spec, hover])
 
   const set = (patch) => setSpec(s => ({ ...s, ...patch }))
   function pick(slot, opt) {
@@ -21,6 +74,16 @@ export default function PortraitsPage() {
       const cur = spec[slot]
       set({ [slot]: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] })
     } else set({ [slot]: opt })
+  }
+  function randomize() {
+    const next = { ...spec, shape: { ...spec.shape }, palette: { ...spec.palette } }
+    for (const slot of SLOT_ORDER) {
+      const opts = SLOT_OPTIONS[slot]
+      next[slot] = MULTI.includes(slot) ? opts.filter(() => Math.random() < 0.25) : pickOne(opts)
+    }
+    for (const x of SHAPES) next.shape[x.key] = +(x.min + Math.random() * (x.max - x.min)).toFixed(2)
+    for (const c of Object.keys(SWATCHES)) next.palette[c] = pickOne(SWATCHES[c])[1]
+    setSpec(normalizeSpec(next))
   }
   function flash(msg) { setStatus(msg); setTimeout(() => setStatus(''), 2500) }
   function copy() {
@@ -45,15 +108,18 @@ export default function PortraitsPage() {
         <div className="dp-stagecol">
           <div className="dp-stages">
             <figure className="dp-stage">
-              <Portrait spec={spec} frame="full" anchors={anchors} />
+              <Portrait spec={shown} frame="full" anchors={anchors} />
               <figcaption>Full figure</figcaption>
             </figure>
             <figure className="dp-stage dp-stage-bust">
-              <div className="dp-ibx"><Portrait spec={spec} frame="bust" /></div>
+              <div className="dp-ibx"><Portrait spec={shown} frame="bust" /></div>
               <figcaption>As the infobox shows it</figcaption>
             </figure>
           </div>
-          <label className="dp-check"><input type="checkbox" checked={anchors} onChange={e => setAnchors(e.target.checked)} /> Show anchors</label>
+          <div className="dp-row">
+            <button type="button" className="dp-btn" onClick={randomize}>🎲 Randomize</button>
+            <label className="dp-check"><input type="checkbox" checked={anchors} onChange={e => setAnchors(e.target.checked)} /> Show anchors</label>
+          </div>
         </div>
 
         <div className="dp-panel">
@@ -62,12 +128,8 @@ export default function PortraitsPage() {
             {SLOT_ORDER.map(slot => (
               <div className="dp-slot" key={slot}>
                 <span>{LABELS[slot]}</span>
-                <div className="dp-chips">
-                  {SLOT_OPTIONS[slot].map(opt => {
-                    const on = MULTI.includes(slot) ? spec[slot].includes(opt) : spec[slot] === opt
-                    return <button key={opt} type="button" className={'dp-chip' + (on ? ' on' : '')} aria-pressed={on} onClick={() => pick(slot, opt)}>{opt}</button>
-                  })}
-                </div>
+                <PartSelect slot={slot} spec={spec} onPick={opt => pick(slot, opt)}
+                  onPreview={opt => setHover(opt == null ? null : { slot, opt })} />
               </div>
             ))}
           </section>
