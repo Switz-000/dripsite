@@ -39,6 +39,18 @@ function bake(str, ax, bx, ay, by){
 const move = (str,dx,dy) => bake(str,1,dx,1,dy);
 const about = (sx,sy,cx,cy,dx=0,dy=0) => [sx, cx-cx*sx+dx, sy, cy-cy*sy+dy];
 
+/* vertical extent [top, bottom] of path data (control points included, so a hair generous) */
+const yRange = (...ds) => { let lo=Infinity, hi=-Infinity;
+  for(const d of ds){ if(!d) continue; let cmd='', i=0;
+    for(const t of d.match(/[A-Za-z]|-?\d*\.?\d+(?:e-?\d+)?/g)||[]){
+      if(/[A-Za-z]/.test(t)){ cmd=t; i=0; continue; }
+      const v=+t;
+      if(cmd==='V'||cmd==='v' || (cmd!=='H'&&cmd!=='h' && i++%2===1)){ lo=Math.min(lo,v); hi=Math.max(hi,v); } } }
+  return [lo,hi]; };
+/* the same, relative to the part's own origin, for a part kept as {d | fill, ink, o} */
+const relY = (part, ...keys) => { const [lo,hi]=yRange(...keys.map(k=>part[k])); return [lo-part.o[1], hi-part.o[1]]; };
+const FACE_GAP = 3;   // air kept between facial hair and the nose or mouth it sits beside
+
 /* ---------- Parts: each draws itself around its own origin ---------- */
 const onAnchor = (o,x,y,fill) => move(`<path d="${o.d}" fill="${fill}" fill-rule="evenodd"/>`, x-o.o[0], y-o.o[1]);
 const glassLayer = (g,p) => `<path d="${g.rim}" fill="${p}" fill-rule="evenodd"/><path d="${g.frame}" fill="${K}" fill-rule="evenodd"/>`;
@@ -159,8 +171,25 @@ export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
   const A = { eyeL:[xl,eyeY], eyeR:[xr,eyeY], browL:[xl,eyeY-15], browR:[xr,eyeY-15],
               nose:[200,upY(222)], mouth:[200,upY(264)], hat:[200,upY(HEAD.cy-HEAD.ry*0.55)] };
   const M=PARTS.mouth[s.mouth]; A.cig=[A.mouth[0]+M.cig[0], A.mouth[1]+M.cig[1]];
-  A.brow=[200,eyeY-15]; A.cheekL=[xl,A.mouth[1]]; A.cheekR=[xr,A.mouth[1]];
   A.chin=[200, CHIN-grow];
+  /* Facial hair is drawn for one fixed face, so a longer nose or a taller mouth would run into it.
+     Slide the hair clear of the nose, drop the mouth clear of the hair, and push a chin tuft below the mouth. */
+  const facialDy = {};
+  const stache = s.facial.find(n=>STACHE.includes(n));
+  const mouthBox = relY(s.mouth==='line' ? BASE.mouth : BASE.mouths[s.mouth], 'd', 'ink', 'fill');
+  const noseBottom = A.nose[1] + relY(BASE.noses[s.nose], 'd')[1];
+  if(stache){
+    const [top, bot] = relY(FACIAL[stache], 'fill', 'ink');
+    const dy = Math.max(0, noseBottom + FACE_GAP - (A.mouth[1] + top));
+    const drop = Math.max(0, A.mouth[1] + dy + bot + FACE_GAP - (A.mouth[1] + mouthBox[0]));
+    facialDy[stache] = dy;
+    A.mouth[1] += drop; A.cig[1] += drop;
+  }
+  for(const n of s.facial){ if(FACIAL[n].anchor==='chin'){
+    const top = relY(FACIAL[n], 'fill', 'ink')[0];
+    facialDy[n] = Math.max(0, A.mouth[1] + mouthBox[1] + FACE_GAP - (A.chin[1] + top));
+  } }
+  A.brow=[200,eyeY-15]; A.cheekL=[xl,A.mouth[1]]; A.cheekR=[xr,A.mouth[1]];
   /* three kinds of hair: 'clip' sits inside the head, 'volume' is drawn over it, 'long' adds a back layer behind it */
   const HR = HAIRS[s.hair];
   /* outer silhouette of hair = body line weight; lines that fall over the face (bangs) keep Martín's thinner weight */
@@ -176,7 +205,7 @@ export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
   /* long hair: the head outline disappears under the fringe, so hair flows into the back layer */
   const outlineMask = HR && HR.kind==='long' ? `<mask id="${ID}om" maskUnits="userSpaceOnUse" x="-40" y="-40" width="480" height="770"><rect x="-40" y="-40" width="480" height="770" fill="#fff"/>${bake(`<path d="${HR.d}" fill="#000" stroke="#000" stroke-width="7"/>`, ...UP)}</mask>` : '';
   const facial = s.facial.map(n=>{ const f=FACIAL[n], [x,y]=A[f.anchor];
-    return move(`<path d="${f.fill}" fill="${p.facial}"/><path d="${f.ink}" fill="${shade(p.facial)}" fill-rule="evenodd"/>`, x-f.o[0], y-f.o[1]); }).join('');
+    return move(`<path d="${f.fill}" fill="${p.facial}"/><path d="${f.ink}" fill="${shade(p.facial)}" fill-rule="evenodd"/>`, x-f.o[0], y-f.o[1]+(facialDy[n]||0)); }).join('');
   const extras = s.extras.map(n=> BASE.extras[n].map(pc=> onAnchor(pc, ...A[pc.anchor], EXTRA_GREY)).join('')).join('');
   const handDx=(sh.bodyW-1)*TORSO_HALF, handDy=-grow*0.45;
   const E=PARTS.eyes[s.eyes];
