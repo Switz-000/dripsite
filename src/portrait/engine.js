@@ -133,7 +133,7 @@ export const SHAPES = [
 export const COLORS = ['skin','hair','facial','frames','outfit','suit','shirt','tie'];
 /* sampled from Martín's chart of Susian leaders (1978-2009) */
 export const SWATCHES = {
-  skin:   [['White','#ffffff'],['Cream','#fbefe2'],['Peach','#f6d9bf'],['Tan','#e0b48a'],['Brown','#a8754f'],['Deep brown','#6b4429'],['Ebony','#3d2616']],
+  skin:   [['White','#ffffff']],
   hair:   [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3'],
            ['Black','#141210'],['Chestnut','#6b4a2e'],['Blonde','#e2c275'],['Ginger','#b5532a'],['White','#f2f2f2'],['Slate','#7a808a']],
   facial: [['Serec','#bd8530'],['Razol','#5c4b43'],['Nozeslawna, Tessan','#4d1100'],['Lasmanna','#c3c3c3'],
