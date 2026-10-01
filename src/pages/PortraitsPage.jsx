@@ -162,10 +162,11 @@ export default function PortraitsPage() {
     const next = { ...spec, shape: { ...spec.shape }, palette: { ...spec.palette } }
     for (const slot of SLOT_ORDER) {
       const opts = SLOT_OPTIONS[slot]
-      next[slot] = MULTI.includes(slot) ? opts.filter(() => Math.random() < 0.25) : pickOne(opts)
+      next[slot] = MULTI.includes(slot) ? opts.filter(() => Math.random() < 0.25)
+        : pickOne(slot === 'outfit' ? opts.filter(o => o !== 'none') : opts)
     }
     for (const x of SHAPES) next.shape[x.key] = +(x.min + Math.random() * (x.max - x.min)).toFixed(2)
-    for (const c of Object.keys(SWATCHES)) next.palette[c] = pickOne(SWATCHES[c])[1]
+    for (const c of Object.keys(SWATCHES)) if (c !== 'skin') next.palette[c] = pickOne(SWATCHES[c])[1]
     setSpec(normalizeSpec(next))
   }
   function flash(msg) { setStatus(msg); setTimeout(() => setStatus(''), 2500) }

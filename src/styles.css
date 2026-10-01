@@ -1362,11 +1362,11 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .devtools-toggle.on { opacity: 1; color: var(--text-accent); }
 
 .dp-lede { font-family: var(--font-body); color: var(--text-secondary); margin: 8px 0 20px; max-width: 60ch; }
-.dp-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 900px) { .dp-grid { grid-template-columns: 1fr; } }
+.dp-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .dp-grid { grid-template-columns: 1fr; } }
 .dp-stagecol { display: grid; gap: 10px; position: sticky; top: 16px; }
-@media (max-width: 900px) { .dp-stagecol { position: static; } }
-.dp-stages { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+@media (max-width: 1000px) { .dp-stagecol { position: static; } }
+.dp-stages { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; }
 @media (max-width: 600px) { .dp-stages { grid-template-columns: 1fr; } }
 .dp-select { position: relative; }
 .dp-selbtn { display: flex; justify-content: space-between; gap: 8px; width: 100%; max-width: 260px; font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-primary); cursor: pointer; text-align: left; }
