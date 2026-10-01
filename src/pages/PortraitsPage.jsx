@@ -175,6 +175,7 @@ export default function PortraitsPage() {
     next.facial = [...(stache === 'none' ? [] : [stache]), ...FACIAL_OPTS.filter(() => Math.random() < 0.25)]
     for (const x of SHAPES) next.shape[x.key] = +(x.min + Math.random() * (x.max - x.min)).toFixed(2)
     for (const c of Object.keys(SWATCHES)) if (c !== 'skin') next.palette[c] = pickOne(SWATCHES[c])[1]
+    next.palette.facial = next.palette.hair   // beard and mustache match the hair
     setSpec(normalizeSpec(next))
   }
   function flash(msg) { setStatus(msg); setTimeout(() => setStatus(''), 2500) }
