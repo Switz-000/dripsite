@@ -1,23 +1,36 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Portrait from '../portrait/Portrait'
-import { DEFAULT_SPEC, SLOT_OPTIONS, SLOT_ORDER, MULTI, SHAPES, COLORS, SWATCHES, normalizeSpec, toYaml } from '../portrait/engine'
+import { DEFAULT_SPEC, SLOT_OPTIONS, SLOT_ORDER, MULTI, STACHE, SHAPES, COLORS, SWATCHES, normalizeSpec, toYaml } from '../portrait/engine'
 import { parseFrontmatter } from '../utils/markdown'
 import { listPeople, exportPortrait, getToken, setToken } from '../portrait/vaultPortraits'
 
 // Dev tool: build a character portrait from parts and copy the spec into a
 // person article's frontmatter. The infobox reads the same spec.
 const LABELS = { eyes: 'Eyes', eyeliner: 'Eyeliner', brows: 'Brows', nose: 'Nose', mouth: 'Mouth', hair: 'Hair',
-  facial: 'Facial hair', eyewear: 'Eyewear', outfit: 'Outfit', extras: 'Extras' }
+  stache: 'Mustache', facial: 'Facial hair', eyewear: 'Eyewear', outfit: 'Outfit', extras: 'Extras' }
+
+const FACIAL_OPTS = SLOT_OPTIONS.facial.filter(o => !STACHE.includes(o))
+const PARTS = SLOT_ORDER.flatMap(slot => (slot === 'facial' ? ['stache', 'facial'] : [slot]))
+const optionsFor = (slot) => (slot === 'stache' ? ['none', ...STACHE] : slot === 'facial' ? FACIAL_OPTS : SLOT_OPTIONS[slot])
+const isMulti = (slot) => slot === 'facial' || MULTI.includes(slot)
+const valueOf = (spec, slot) => (slot === 'stache' ? (spec.facial.find(o => STACHE.includes(o)) || 'none') : slot === 'facial' ? spec.facial.filter(o => !STACHE.includes(o)) : spec[slot])
+// The spec after choosing `opt` in `slot`: multi parts toggle it, the mustache part swaps it
+function applyChange(spec, slot, opt) {
+  if (slot === 'stache') return { ...spec, facial: [...spec.facial.filter(o => !STACHE.includes(o)), ...(opt === 'none' ? [] : [opt])] }
+  if (isMulti(slot)) {
+    const cur = spec[slot]
+    return { ...spec, [slot]: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] }
+  }
+  return { ...spec, [slot]: opt }
+}
 
 const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
 // Dropdown whose options preview on hover: onPreview(opt) while an option is
 // under the pointer or keyboard focus, onPreview(null) when it leaves.
-function PartSelect({ slot, spec, onPick, onPreview }) {
+function PartSelect({ options, value, multi, onPick, onPreview }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const multi = MULTI.includes(slot)
-  const value = spec[slot]
   const label = multi ? (value.length ? value.join(', ') : 'none') : value
   const isOn = (opt) => (multi ? value.includes(opt) : value === opt)
 
@@ -40,7 +53,7 @@ function PartSelect({ slot, spec, onPick, onPreview }) {
       </button>
       {open && (
         <ul className="dp-menu" role="listbox" aria-multiselectable={multi} onMouseLeave={() => onPreview(null)}>
-          {SLOT_OPTIONS[slot].map(opt => (
+          {options.map(opt => (
             <li key={opt}>
               <button type="button" role="option" aria-selected={isOn(opt)} className={'dp-opt' + (isOn(opt) ? ' on' : '')}
                 onMouseEnter={() => onPreview(opt)} onFocus={() => onPreview(opt)} onClick={() => choose(opt)}>
@@ -145,26 +158,21 @@ export default function PortraitsPage() {
   const yaml = useMemo(() => toYaml(spec), [spec])
   const shown = useMemo(() => {
     if (!hover) return spec
-    const { slot, opt } = hover
-    if (!MULTI.includes(slot)) return { ...spec, [slot]: opt }
-    const cur = spec[slot]
-    return { ...spec, [slot]: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] }
+    return applyChange(spec, hover.slot, hover.opt)
   }, [spec, hover])
 
   const set = (patch) => setSpec(s => ({ ...s, ...patch }))
-  function pick(slot, opt) {
-    if (MULTI.includes(slot)) {
-      const cur = spec[slot]
-      set({ [slot]: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] })
-    } else set({ [slot]: opt })
-  }
+  function pick(slot, opt) { setSpec(s => applyChange(s, slot, opt)) }
   function randomize() {
     const next = { ...spec, shape: { ...spec.shape }, palette: { ...spec.palette } }
     for (const slot of SLOT_ORDER) {
       const opts = SLOT_OPTIONS[slot]
+      if (slot === 'facial') continue
       next[slot] = MULTI.includes(slot) ? opts.filter(() => Math.random() < 0.25)
         : pickOne(slot === 'outfit' ? opts.filter(o => o !== 'none') : opts)
     }
+    const stache = pickOne(['none', ...STACHE])
+    next.facial = [...(stache === 'none' ? [] : [stache]), ...FACIAL_OPTS.filter(() => Math.random() < 0.25)]
     for (const x of SHAPES) next.shape[x.key] = +(x.min + Math.random() * (x.max - x.min)).toFixed(2)
     for (const c of Object.keys(SWATCHES)) if (c !== 'skin') next.palette[c] = pickOne(SWATCHES[c])[1]
     setSpec(normalizeSpec(next))
@@ -209,10 +217,10 @@ export default function PortraitsPage() {
         <div className="dp-panel">
           <section className="dp-group">
             <h2>Parts</h2>
-            {SLOT_ORDER.map(slot => (
+            {PARTS.map(slot => (
               <div className="dp-slot" key={slot}>
                 <span>{LABELS[slot]}</span>
-                <PartSelect slot={slot} spec={spec} onPick={opt => pick(slot, opt)}
+                <PartSelect options={optionsFor(slot)} value={valueOf(spec, slot)} multi={isMulti(slot)} onPick={opt => pick(slot, opt)}
                   onPreview={opt => setHover(opt == null ? null : { slot, opt })} />
               </div>
             ))}

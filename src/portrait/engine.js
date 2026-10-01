@@ -118,6 +118,8 @@ const NOSES = Object.fromEntries(Object.entries(BASE.noses).map(([n,o])=>[n,(x,y
 const HAIRS = { none:null, ...BASE.hair };
 const FACIAL = BASE.facial;
 export const MULTI = ['extras','facial'];
+/* a face carries one of these at most; the page lists them as their own "Mustache" part */
+export const STACHE = ['mustache','brush'];
 const EXTRA_GREY = '#c4c4c4';   // wrinkles and marks read as shading, not ink
 /* outlines of hair are a darker shade of the hair itself, never black */
 const shade = (hex, k=0.62) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.slice(i,i+2),16)*k).toString(16).padStart(2,'0')).join('');
@@ -235,6 +237,7 @@ export function normalizeSpec(raw){
       // the site's frontmatter reader keeps `[a, b]` as a string, so accept both forms
       const v = Array.isArray(r[k]) ? r[k] : (typeof r[k] === 'string' ? r[k].replace(/^\s*\[|\]\s*$/g, '').split(',') : []);
       s[k] = v.map(x => String(x).trim()).filter(x => opts.includes(x));
+      if (k === 'facial') { const i = s[k].findIndex(x => STACHE.includes(x)); s[k] = s[k].filter((x, j) => !STACHE.includes(x) || j === i) }
     } else if (r[k] != null) {
       const v = String(r[k]).trim();
       if (opts.includes(v)) s[k] = v;

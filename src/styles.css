@@ -1366,7 +1366,7 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 @media (max-width: 1000px) { .dp-grid { grid-template-columns: 1fr; } }
 .dp-stagecol { display: grid; gap: 10px; position: sticky; top: 16px; }
 @media (max-width: 1000px) { .dp-stagecol { position: static; } }
-.dp-stages { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; }
+.dp-stages { align-items: start; display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; }
 @media (max-width: 600px) { .dp-stages { grid-template-columns: 1fr; } }
 .dp-select { position: relative; }
 .dp-selbtn { display: flex; justify-content: space-between; gap: 8px; width: 100%; max-width: 260px; font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-primary); cursor: pointer; text-align: left; }
@@ -1379,8 +1379,8 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .dp-stage figcaption { font-family: var(--font-ui); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
 .dp-ibx { border: 1px solid var(--border-strong); background: var(--bg-surface); aspect-ratio: 4 / 4.4; overflow: hidden; }
 .dp-check { font-family: var(--font-ui); font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
-.dp-panel { background: var(--bg-surface); border: 1px solid var(--border); padding: 16px; display: grid; gap: 18px; font-family: var(--font-ui); }
-.dp-group { display: grid; gap: 9px; }
+.dp-panel { grid-template-columns: minmax(0, 1fr); min-width: 0; background: var(--bg-surface); border: 1px solid var(--border); padding: 16px; display: grid; gap: 18px; font-family: var(--font-ui); }
+.dp-group { min-width: 0; grid-template-columns: minmax(0, 1fr); display: grid; gap: 9px; }
 .dp-group h2 { font-family: var(--font-ui); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 5px; }
 .dp-slot { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: center; }
 @media (max-width: 480px) { .dp-slot { grid-template-columns: 1fr; gap: 4px; } }
