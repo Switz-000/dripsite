@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Portrait from '../portrait/Portrait'
 import { DEFAULT_SPEC, SLOT_OPTIONS, SLOT_ORDER, MULTI, SHAPES, COLORS, SWATCHES, normalizeSpec, toYaml } from '../portrait/engine'
 import { parseFrontmatter } from '../utils/markdown'
+import { listPeople, exportPortrait, getToken, setToken } from '../portrait/vaultPortraits'
 
 // Dev tool: build a character portrait from parts and copy the spec into a
 // person article's frontmatter. The infobox reads the same spec.
@@ -50,6 +51,88 @@ function PartSelect({ slot, spec, onPick, onPreview }) {
         </ul>
       )}
     </div>
+  )
+}
+
+// Import from / export to the person articles in the vault.
+function VaultSection({ spec, onImport, flash }) {
+  const [people, setPeople] = useState(null)
+  const [progress, setProgress] = useState(null)
+  const [error, setError] = useState('')
+  const [mode, setMode] = useState(null)   // 'import' | null: whether the import list is open
+  const [q, setQ] = useState('')
+  const [target, setTarget] = useState('')  // path of the article to export to
+  const [token, setTok] = useState(getToken)
+  const [busy, setBusy] = useState(false)
+
+  async function load(force) {
+    setError(''); setProgress([0, 1])
+    try { setPeople(await listPeople((d, t) => setProgress([d, t]), force)) }
+    catch (e) { setError(e.message) }
+    setProgress(null)
+  }
+  function openImport() { setMode(m => (m ? null : 'import')); if (!people && !progress) load() }
+  const match = (p) => p.name.toLowerCase().includes(q.trim().toLowerCase())
+  const withPortrait = (people || []).filter(p => p.portrait && match(p))
+  const targetPerson = (people || []).find(p => p.path === target)
+
+  async function doExport() {
+    const verb = targetPerson.portrait ? 'overwrite the portrait on' : 'add a portrait to'
+    if (!window.confirm(`This commits straight to the vault and will ${verb} "${targetPerson.name}". Continue?`)) return
+    setBusy(true)
+    try { await exportPortrait(target, spec); setPeople([...people]); flash(`Saved to ${targetPerson.name}. The site updates on its next rebuild.`) }
+    catch (e) { flash(e.message) }
+    setBusy(false)
+  }
+
+  return (
+    <section className="dp-group">
+      <h2>Vault</h2>
+      <div className="dp-row">
+        <button type="button" className="dp-btn dp-btn-quiet" onClick={openImport}>{mode ? 'Close import' : 'Import…'}</button>
+        <button type="button" className="dp-btn dp-btn-quiet" onClick={() => { if (!people && !progress) load() }} disabled={!!people || !!progress}>
+          {people ? `${people.length} people loaded` : 'Load people'}
+        </button>
+        {progress && <span className="dp-status">Reading articles {progress[0]}/{progress[1]}…</span>}
+        {error && <span className="dp-status">{error}</span>}
+      </div>
+
+      {mode === 'import' && people && (
+        <div className="dp-people">
+          <input className="dp-search" type="search" placeholder="Search people with portraits" value={q} onChange={e => setQ(e.target.value)} />
+          <ul className="dp-peoplelist">
+            {withPortrait.map(p => (
+              <li key={p.path}>
+                <button type="button" className="dp-person" onClick={() => { onImport(p.portrait); setTarget(p.path); setMode(null); flash(`Imported ${p.name}. Export is now aimed at the same article.`) }}>
+                  <span className="dp-face"><Portrait spec={p.portrait} frame="face" /></span>{p.name}
+                </button>
+              </li>
+            ))}
+            {!withPortrait.length && <li className="dp-status">No matching portraits.</li>}
+          </ul>
+        </div>
+      )}
+
+      {people && (
+        <label className="dp-slot">
+          <span>Export to</span>
+          <select className="dp-selbtn" value={target} onChange={e => setTarget(e.target.value)}>
+            <option value="">Pick a person article…</option>
+            {people.map(p => <option key={p.path} value={p.path}>{p.name}{p.portrait ? ' (has portrait)' : ''}</option>)}
+          </select>
+        </label>
+      )}
+      <label className="dp-slot">
+        <span>GitHub token</span>
+        <input className="dp-search" type="password" placeholder="Needs write access to the vault" value={token}
+          onChange={e => { setTok(e.target.value); setToken(e.target.value.trim()) }} autoComplete="off" />
+      </label>
+      <div className="dp-row">
+        <button type="button" className="dp-btn" onClick={doExport} disabled={!targetPerson || !token.trim() || busy}>
+          {busy ? 'Exporting…' : targetPerson ? (targetPerson.portrait ? 'Export (overrides)' : 'Export (adds)') : 'Export'}
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -166,6 +249,8 @@ export default function PortraitsPage() {
               ))}
             </div>
           </section>
+
+          <VaultSection spec={spec} onImport={p => setSpec(normalizeSpec(p))} flash={flash} />
 
           <section className="dp-group">
             <h2>Spec</h2>

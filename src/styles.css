@@ -1439,3 +1439,8 @@ tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
 .wiki-popup-portrait svg { height: 200px; width: auto; margin: 0 auto; }
 
 .ibx-qstat-sub::first-letter { text-transform: uppercase; }
+.dp-search { width: 100%; max-width: 260px; font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-primary); }
+.dp-peoplelist { list-style: none; margin: 6px 0 0; padding: 0; max-height: 280px; overflow-y: auto; border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.dp-person { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 8px; border: 0; background: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-align: left; }
+.dp-person:hover { background: var(--bg); }
+.dp-face { width: 36px; height: 36px; flex: none; overflow: hidden; border: 1px solid var(--border); background: var(--bg-surface); }
