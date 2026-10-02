@@ -1,0 +1,14 @@
+{
+  "name": "toast",
+  "about": "Brings a held drink to the chest, raises it high with two small cheers, eyes shut in a grin, then brings it back down. Pair with a drink prop in the leading hand.",
+  "length": 104,
+  "keys": [
+    [0, {"rx": -18, "ry": -45, "brow": -2}, "smile"],
+    [20, {"lean": -3, "tilt": -5, "hy": -3, "brow": -7, "lx": -12, "ly": -35, "happy": 1, "handR": {"to": "headR", "dx": 35, "dy": -30}}, "smile"],
+    [78, {"rx": -18, "ry": -45, "brow": -2}, "smile"]
+  ],
+  "osc": [
+    {"p": "ry", "amp": -16, "hz": 2.3, "from": 36, "to": 66, "shape": "pulse"},
+    {"p": "hy", "amp": 2.5, "hz": 2.3, "from": 36, "to": 66, "shape": "pulse"}
+  ]
+}
