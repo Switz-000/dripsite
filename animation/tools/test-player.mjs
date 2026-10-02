@@ -37,6 +37,10 @@ try {
   const editor = pg.locator('.an-editor'), time = () => pg.locator('.an-time').innerText()
   const frameNo = async () => +(await time()).match(/frame (\d+)/)[1]
   const lm = name => pg.evaluate(n => { const c = [...document.querySelectorAll('.an-svg circle')].find(c => c.querySelector('title')?.textContent === n); if (!c) return null; const r = c.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2] }, name)
+  // the same landmark in scene units (immune to the page moving), and the screen-to-scene scale
+  const lmScene = name => pg.evaluate(n => { const c = [...document.querySelectorAll('.an-svg circle')].find(c => c.querySelector('title')?.textContent === n); return c ? [+c.getAttribute('cx'), +c.getAttribute('cy')] : null }, name)
+  const stageY = () => pg.evaluate(() => document.querySelector('.an-stage').getBoundingClientRect().y)
+  const scale = () => pg.evaluate(() => 1280 / document.querySelector('.an-stage').getBoundingClientRect().width)
   const settle = () => sleep(900)
 
   const logs = []; pg.on('console', m => logs.push(m.text())); pg.on('requestfailed', r => logs.push('failed: ' + r.url().slice(0, 100)))
@@ -55,10 +59,11 @@ try {
   await pg.locator('label:has-text("Landmarks") input').check(); await sleep(300)
   check('landmarks overlay', await pg.locator('.an-svg circle title').count() > 50)
 
-  const h = await lm('lasmanna.handL')
+  const h = await lm('lasmanna.handL'), w1 = await lmScene('lasmanna.handL'), y1 = await stageY(), k = await scale()
   await pg.mouse.move(...h); await pg.mouse.down(); await pg.mouse.move(h[0] + 15, h[1] - 20, { steps: 6 }); await pg.mouse.up(); await settle()
-  const h2 = await lm('lasmanna.handL'), moved = [h2[0] - h[0], h2[1] - h[1]]
-  check('drag moves the hand exactly where it was dropped', Math.abs(moved[0] - 15) < 2.5 && Math.abs(moved[1] + 20) < 2.5, `moved ${moved.map(v => v.toFixed(1))}`)
+  const w2 = await lmScene('lasmanna.handL'), moved = [(w2[0] - w1[0]) / k, (w2[1] - w1[1]) / k]
+  check('drag moves the hand exactly where it was dropped', Math.abs(moved[0] - 15) < 2.5 && Math.abs(moved[1] + 20) < 2.5, `moved ${moved.map(v => v.toFixed(1))} screen px`)
+  check('the stage does not jump when the status changes', Math.abs(await stageY() - y1) < 1, `moved ${(await stageY() - y1).toFixed(1)}px`)
   check('drag rewrites the beat line', /to: 'brow', dx: -?[\d.]+, dy: -?[\d.]+/.test(await editor.inputValue()) && !/dx: -12, dy: -18/.test(await editor.inputValue()))
 
   await pg.keyboard.press('Home'); await pg.keyboard.press('ArrowRight'); await pg.keyboard.press('ArrowRight'); await sleep(300)

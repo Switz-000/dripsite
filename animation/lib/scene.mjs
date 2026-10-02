@@ -7,12 +7,16 @@
 //   cast:   { key: { who: 'Grawolja Lasmanna', spot: 'seatL' | at: [x, ground], scale, nudge: [dx,dy],
 //                   props: { R: 'pen' }, presets: [{ preset, at, side, size, speed }], reactions: [...] } }
 //   events: { flash: { bursts: [[from, to]], extra: [t, ...] } }
+//   captions: [{ t: [from, to], text, style: 'sub' | 'title' }]   subtitles, or a lower-third title ('Name\nline two')
+//   cast options: layer: 'front' draws the body over the set's foreground; a spot's clip: [x0,y0,x1,y1] keeps
+//                 the character inside that rectangle (a figure in a picture frame)
 //   beats:  [{ who, t: [from, to], ...one of:
 //             hand: 'L'|'R', to: 'headTop' | [x,y] | { who, to } | { nib: 'docL' }, dx, dy
 //             sign: 'docL', hand: 'R', part: [0, .55]        pen follows the signature on that document
 //             look: { tilt, lean, hx, hy, brow }              blended in and out
 //             face: { mouth, eyes: 'happy'|'closed'|'squeeze' }
 //             nod: 1                                          small nods across the window
+//             walk: x                                         walks to scene x, stepping and waddling
 //           in, out: seconds of easing (default .25) }]
 //   reactions per cast member: { always: 'scowl'|'smile' } | { on: 'flash', do: 'flinch'|'grin'|'blink', from, to }
 import { play } from './play.mjs'
@@ -63,6 +67,21 @@ export function runScene(scene, { cast, presets, sets, assets = {}, fps } = {}){
     const spot = c.spot ? set.spots[c.spot] : { x:c.at[0], ground:c.at[1] }; if (!spot) throw new Error('No spot ' + c.spot)
     const S = c.scale || spot.scale || S0, [nx,ny] = c.nudge || [0,0]
     place[k] = spot.seat != null ? { S, tx: spot.x-200*S+nx, ty: spot.seat-425*S+ny, seated:true } : { S, tx: spot.x-200*S+nx, ty: spot.ground-712*S+ny, seated:false }
+    place[k].x0 = spot.x + nx; place[k].clip = c.clip || spot.clip || null; place[k].front = c.layer === 'front'
+  }
+
+  /* walking: where each character stands at every frame, from its walk beats in time order */
+  const walkX = {}
+  for (const k of Object.keys(scene.cast)){
+    const ws = (scene.beats||[]).filter(b => b.who === k && b.walk != null && Array.isArray(b.t)).sort((a,b) => a.t[0]-b.t[0])
+    const xs = new Float64Array(N), moving = new Float64Array(N); let x = place[k].x0, wi = 0
+    for (let f = 0; f < N; f++){
+      while (wi < ws.length && f >= sec(ws[wi].t[1])){ x = ws[wi].walk; wi++ }
+      const b = ws[wi]
+      if (b && f >= sec(b.t[0])){ const a = sec(b.t[0]), z = sec(b.t[1]), k2 = ease((f-a)/Math.max(1,z-a)); xs[f] = x + (b.walk-x)*k2; moving[f] = Math.sign(b.walk-x) * Math.min(1, Math.sin(Math.PI*(f-a)/Math.max(1,z-a))*3) }
+      else xs[f] = x
+    }
+    walkX[k] = { xs, moving }
   }
 
   /* play every cast member; beats and reactions run in the per-frame drive */
@@ -74,7 +93,12 @@ export function runScene(scene, { cast, presets, sets, assets = {}, fps } = {}){
     const timeline = (c.presets || [{ preset:'idle' }]).map(p => ({ ...p, at: p.at != null ? sec(p.at) : undefined }))
     rows[k] = play(who.spec, timeline, { presets, fps, id:k, length:N, tail:0, props, layers:true, seed:k.length*7+3, drive:(f, anim, ctx) => {
       let mouth = null
+      { const W_ = walkX[k], mv = W_.moving[f]
+        anim.jx = (W_.xs[f] - P.x0) / P.S
+        if (mv){ const ph = f/fps*2*Math.PI*2.1                      // about two steps a second
+          anim.jy = -7*Math.abs(Math.sin(ph))*Math.abs(mv); anim.lean += 3*Math.sin(ph)*Math.abs(mv) + 2*mv; anim.tilt += 2*mv } }
       for (const b of my){
+        if (b.walk != null) continue
         const [a,z] = b.t.map(sec), fin = sec(b.in ?? .25), fout = sec(b.out ?? .25)
         if (f < a || f >= z + fout) continue
         const w = (fin ? ease((f-a)/fin) : 1) * (f >= z ? (fout ? 1-ease((f-z)/fout) : 0) : 1)
@@ -114,26 +138,44 @@ export function runScene(scene, { cast, presets, sets, assets = {}, fps } = {}){
     }})
   }
 
-  const put = (k, svg) => { const P = place[k]; return `<g transform="translate(${P.tx.toFixed(1)} ${P.ty.toFixed(1)}) scale(${P.S})">${svg.replace(/^<svg [^>]*>/,'').replace(/<\/svg>\s*$/,'')}</g>` }
-  const standing = order.filter(k => !place[k].seated), seated = order.filter(k => place[k].seated)
+  const put = (k, svg) => { const P = place[k], g = `<g transform="translate(${P.tx.toFixed(1)} ${P.ty.toFixed(1)}) scale(${P.S})">${svg.replace(/^<svg [^>]*>/,'').replace(/<\/svg>\s*$/,'')}</g>`
+    return P.clip ? `<g clip-path="url(#clip-${k})">${g}</g>` : g }
+  const clips = order.filter(k => place[k].clip).map(k => { const [x0,y0,x1,y1] = place[k].clip; return `<clipPath id="clip-${k}"><rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}"/></clipPath>` }).join('')
+  const back = order.filter(k => !place[k].front)
+  const standing = back.filter(k => !place[k].seated), seated = back.filter(k => place[k].seated), front = order.filter(k => place[k].front)
+  const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const wrap = (t, n) => { const out = []; let line = ''; for (const w of String(t).split(' ')){ if ((line+' '+w).trim().length > n && line){ out.push(line); line = w } else line = (line+' '+w).trim() } if (line) out.push(line); return out }
+  function captions(f){
+    return (scene.captions||[]).map(c => {
+      const [a,z] = c.t.map(sec); if (f < a || f >= z) return ''
+      const o = Math.min(1, (f-a)/4, (z-f)/4).toFixed(2)
+      if (c.style === 'title'){ const [l1, ...rest] = String(c.text).split('\n'), w = Math.max(l1.length*15, ...rest.map(r=>r.length*10.5)) + 48
+        return `<g opacity="${o}"><rect x="40" y="${H-170}" width="${w.toFixed(0)}" height="${44 + rest.length*26}" fill="#111" fill-opacity=".82"/><rect x="40" y="${H-170}" width="6" height="${44 + rest.length*26}" fill="#c9a227"/>
+  <text x="62" y="${H-140}" font-family="DejaVu Sans" font-weight="bold" font-size="24" fill="#fff">${esc(l1)}</text>${rest.map((r,i)=>`<text x="62" y="${H-112+i*26}" font-family="DejaVu Sans" font-size="17" fill="#ddd">${esc(r)}</text>`).join('')}</g>` }
+      const lines = wrap(c.text, 58), w = Math.max(...lines.map(l => l.length))*13.2 + 40, h = lines.length*34 + 16
+      return `<g opacity="${o}"><rect x="${((W-w)/2).toFixed(0)}" y="${H-28-h}" width="${w.toFixed(0)}" height="${h}" rx="6" fill="#000" fill-opacity=".72"/>${lines.map((l,i)=>`<text x="${W/2}" y="${H-28-h+36+i*34}" text-anchor="middle" font-family="DejaVu Sans" font-size="24" fill="#fff">${esc(l)}</text>`).join('')}</g>`
+    }).join('')
+  }
   const [W,H] = scene.size || [1280,720]
   const ctxFor = f => ({ f, fps, scene, assets, ink: Object.fromEntries(Object.keys(docs).map(k => [k, { pts: docs[k].pts, p: docProgress(k,f) }])) })
 
-  function frame(f, { landmarks: showLM = false } = {}){
+  function frame(f, { landmarks: showLM = false, captions: showCaptions = true } = {}){
     const ctx = ctxFor(f), fl = flashAmt(f), b = bulbs.filter(q => f-q.t >= 0 && f-q.t < 3)
     const lm = !showLM ? '' : order.map(k => { const P = place[k], L = rows[k][f].landmarks
       return Object.entries(L).map(([n,[x,y]]) => `<circle cx="${(P.tx+x*P.S).toFixed(1)}" cy="${(P.ty+y*P.S).toFixed(1)}" r="4" fill="#d6336c" stroke="#fff" stroke-width="1.5"><title>${k}.${n}</title></circle>`).join('') }).join('')
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-<defs><radialGradient id="bulb"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+<defs>${clips}<radialGradient id="bulb"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
 ${set.back(ctx)}
 ${standing.map(k => put(k, rows[k][f].body)).join('')}
 ${seated.map(k => put(k, rows[k][f].body)).join('')}
 ${set.middle ? set.middle(ctx) : ''}
-${order.map(k => put(k, rows[k][f].hands)).join('')}
+${back.map(k => put(k, rows[k][f].hands)).join('')}
+${front.map(k => put(k, rows[k][f].body) + put(k, rows[k][f].hands)).join('')}
+${showCaptions ? captions(f) : ''}
 ${b.map(q => `<circle cx="${q.x.toFixed(0)}" cy="${q.y.toFixed(0)}" r="${(150*(1-(f-q.t)/3)).toFixed(0)}" fill="url(#bulb)"/>`).join('')}
 ${fl > 0 ? `<rect width="${W}" height="${H}" fill="#fffdf4" fill-opacity="${(fl*0.62).toFixed(3)}"/>` : ''}
 ${lm}
 </svg>`
   }
-  return { N, fps, size:[W,H], frame, flashes, place, rows, set, scene, castInfo: Object.fromEntries(order.map(k => [k, cast[scene.cast[k].who]])) }
+  return { N, fps, size:[W,H], frame, flashes, place, rows, set, scene, walking: (k, f) => !!walkX[k] && (walkX[k].moving[f] !== 0 || walkX[k].xs[f] !== walkX[k].xs[Math.min(N-1, f+1)]), castInfo: Object.fromEntries(order.map(k => [k, cast[scene.cast[k].who]])) }
 }

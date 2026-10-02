@@ -80,8 +80,8 @@ const SNIPPETS = {
   'Happy eyes':                 (w, o, t) => `{ who: '${w}', t: ${t}, face: { mouth: 'smile', eyes: 'happy' } }`,
   'Eyes shut':                  (w, o, t) => `{ who: '${w}', t: ${t}, face: { eyes: 'closed' } }`,
 }
-const KIND_COLOURS = { hand: '#2f6db5', sign: '#7a3fb0', look: '#b5832f', face: '#2f9a6b', nod: '#b5402f' }
-const kindOf = b => b.sign ? 'sign' : b.hand ? 'hand' : b.look ? 'look' : b.face ? 'face' : b.nod ? 'nod' : 'look'
+const KIND_COLOURS = { hand: '#2f6db5', sign: '#7a3fb0', look: '#b5832f', face: '#2f9a6b', nod: '#b5402f', walk: '#6b7280' }
+const kindOf = b => b.walk != null ? 'walk' : b.sign ? 'sign' : b.hand ? 'hand' : b.look ? 'look' : b.face ? 'face' : b.nod ? 'nod' : 'look'
 const fmt = s => s.toFixed(2) + 's'
 /* beats that overlap in time go on separate sub-rows of a character's lane */
 function stack(beats) {

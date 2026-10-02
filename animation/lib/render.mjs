@@ -37,7 +37,8 @@ if (!isMainThread){
   const lm = !!opt('landmarks')
   if (opt('draft')){
     const picks = typeof opt('frames') === 'string' ? opt('frames').split(',').map(Number) : Array.from({length:8}, (_,i) => Math.round(i*(S.N-1)/7))
-    // --focus <who>: crop every cell to one character (all frames share one crop, so movement still reads)
+    // --focus <who>: crop every cell to one character (all frames share one crop, so movement still reads).
+    // Captions are left out: they sit outside the crop, and resvg crashes on a faded group drawn wholly off view.
     const who = typeof opt('focus') === 'string' ? opt('focus') : null
     let view = [0, 0, S.size[0], S.size[1]]
     if (who){
@@ -51,7 +52,7 @@ if (!isMainThread){
     }
     const scale = opt('small') ? 4 : 2, [w,h] = [S.size[0]/scale, S.size[1]/scale]
     const crop = svg => svg.replace(/viewBox="[^"]*"/, `viewBox="${view.map(v=>v.toFixed(1)).join(' ')}"`)
-    await raster(picks.map(f => ({ svg: crop(S.frame(f, { landmarks: lm })), out: path.join(outDir, `k${f}.png`) })), w)
+    await raster(picks.map(f => ({ svg: crop(S.frame(f, { landmarks: lm, captions: !who })), out: path.join(outDir, `k${f}.png`) })), w)
     const cols = 4, rows = Math.ceil(picks.length/cols)
     const cells = picks.map((f,i) => { const x=(i%cols)*w, y=Math.floor(i/cols)*(h+24)
       return `<image x="${x}" y="${y}" width="${w}" height="${h}" href="data:image/png;base64,${fs.readFileSync(path.join(outDir,`k${f}.png`)).toString('base64')}"/><text x="${x+6}" y="${y+h+17}" font-family="DejaVu Sans" font-size="${scale > 2 ? 12 : 15}">${f} · ${(f/S.fps).toFixed(2)}s</text>` }).join('')
