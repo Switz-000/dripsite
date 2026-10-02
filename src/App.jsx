@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -10,6 +10,8 @@ import NotFoundPage from './pages/NotFoundPage'
 import MapPage from './pages/MapPage'
 import LandingPage from './pages/LandingPage'
 import PortraitsPage from './pages/PortraitsPage'
+// loaded only when opened, so readers never download the animation player
+const AnimatePage = lazy(() => import('./pages/AnimatePage'))
 
 export default function App() {
   return (
@@ -28,6 +30,7 @@ export default function App() {
         <Route path="chronology/spans" element={<ChronologyPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="dev/portraits" element={<PortraitsPage />} />
+        <Route path="dev/animate" element={<Suspense fallback={<div className="page-inner">Loading the animation player…</div>}><AnimatePage /></Suspense>} />
         <Route path="*" element={<NotFoundPage />} />
         <Route path="map" element={<MapPage />} />
       </Route>

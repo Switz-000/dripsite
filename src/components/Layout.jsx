@@ -62,6 +62,7 @@ export default function Layout() {
             <div className="sidebar-nav-section">
               <div className="sidebar-nav-label">Dev tools</div>
               <NavLink to="/dev/portraits" className={({ isActive }) => isActive ? 'active' : ''}>Character Portraits</NavLink>
+              <NavLink to="/dev/animate" className={({ isActive }) => isActive ? 'active' : ''}>Animation</NavLink>
             </div>
           )}
           <div className="sidebar-nav-section">

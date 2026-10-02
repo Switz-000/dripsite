@@ -91,9 +91,10 @@ export function play(spec, timeline, { presets, fps=24, id='c', tail=12, length=
     const posed = { ...spec, shape }
     if (drive){ const o = drive(f, anim, { spec:posed, landmarks:a=>landmarks(posed, a||anim), handOffset:(sd,pt,a)=>handOffset(posed, a||anim, sd, pt) }) || {}; if (o.mouth) m2 = o.mouth }
     const s2 = { ...posed, mouth:m2 }
-    const out = { anim, spec:s2, landmarks: landmarks(s2, anim) }
-    if (layers){ out.body = compose(s2, { id, frame:'full', anim:{ ...anim, layer:'body' } }); out.hands = compose(s2, { id:id+'h', frame:'full', anim:{ ...anim, layer:'hands' } }) }
-    else out.svg = compose(s2, { id, frame:'full', anim })
+    // drawings are made only when a frame is shown, so re-running a scene after an edit is instant
+    const out = { anim, spec:s2, landmarks: landmarks(s2, anim) }, lazy = (k, make) => { let v; Object.defineProperty(out, k, { get: () => v ?? (v = make()), enumerable: true }) }
+    if (layers){ lazy('body', () => compose(s2, { id, frame:'full', anim:{ ...anim, layer:'body' } })); lazy('hands', () => compose(s2, { id:id+'h', frame:'full', anim:{ ...anim, layer:'hands' } })) }
+    else lazy('svg', () => compose(s2, { id, frame:'full', anim }))
     frames.push(out)
   }
   return frames

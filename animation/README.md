@@ -18,6 +18,26 @@ Options: `--frames 0,40,90` picks draft frames, `--landmarks` draws every landma
 `--audio voice.wav@1.5` adds sound starting at 1.5 s. The vault is read from `VAULT_DIR`, or from
 `../../dripstao/dripwiki` next to this repo on Martín's PC.
 
+## Working in the browser
+
+Turn on **dev tools** (bottom of the sidebar) and open **Animation** (`/dev/animate`). It plays any scene in
+`animation/scenes/` live, with the same engine the command line uses.
+
+- **Play and step:** space plays, arrows step a frame, shift+arrows a second. The timeline shows each
+  character's beats (click one to jump to it and select its line) and the camera flashes.
+- **Edit:** change the scene file in the editor and the stage re-runs. Errors appear under the editor.
+  Edits are kept in this browser until you save, so a refresh never loses work. **Revert** goes back to the repo version.
+- **Drag to fix:** pause, then drag a hand. The beat driving that hand gets new `dx`/`dy` (or a new
+  `to: [x, y]` point). If no beat drives the hand at that moment, a new one-second beat is added. Signing beats
+  follow the ink and can't be dragged. Tick **Landmarks** to see every landmark (hover one for its name).
+- **New:** type a name and press New; the scene starts from a template on the `studio` set.
+- **Save to GitHub:** commits `animation/scenes/<name>.mjs` to dripsite with the same token the portrait
+  composer uses (it needs write access to dripsite). The site redeploys with it.
+- **Export MP4:** silent, encoded in the browser at exact 24 fps. Chrome and Edge make H.264; browsers
+  without an H.264 encoder fall back to VP9 or AV1 in the same .mp4. For sound, use `npm run render -- ... --audio`.
+
+The editor patches beats line by line, so keep **one beat per line** inside `beats: [ ... ]`.
+
 ## How it fits together
 
 | File | What it does |
@@ -26,11 +46,12 @@ Options: `--frames 0,40,90` picks draft frames, `--landmarks` draws every landma
 | `lib/play.mjs` | Plays presets on one character: springs, overshoot, waves, jumps, breathing, blinking. |
 | `lib/scene.mjs` | Runs a scene file: places the cast on a set, applies beats and reactions. Browser-safe, so the site can play scenes live later. |
 | `lib/render.mjs` | Draft contact sheets and full renders, in parallel across CPU cores, then ffmpeg. |
-| `lib/cast.mjs` | Reads every `portrait:` block in the vault, plus `cast-extra.json`. |
+| `lib/cast.mjs` | Reads every `portrait:` block in the vault, plus `cast-extra.json`. `lib/portrait-block.mjs` is the shared reader. |
+| `../src/pages/AnimatePage.jsx`, `../src/animate/` | The `/dev/animate` page: loading, scene text patching, MP4 export, saving. |
 | `lib/props.mjs` | Things hands hold: goblet, marker, pen. Placeholder art. |
 | `presets/*.json` | Reusable moves: idle, wave, nod, point, shrug, hop, clap, toast. |
-| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`. |
-| `scenes/*.mjs` | Scenes, written as data. |
+| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`, `studio` (plain, spots left, centre, right). |
+| `scenes/*.mjs` | Scenes, written as data: `lasman-signing`, `preset-reel` (every preset on two bodies). |
 | `cast-extra.json` | Placeholder looks for people with no spec in the vault yet (Cantij, the aides, Kolkov). |
 
 ## Landmarks

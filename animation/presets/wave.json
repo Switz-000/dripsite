@@ -3,7 +3,7 @@
   "about": "Raises the leading hand to head height and waves it side to side.",
   "length": 60,
   "keys": [
-    [0, {"tilt": 4, "lean": -1.5, "brow": -4, "handR": {"to": "headR", "dx": 40, "dy": -15}}, "smile"],
+    [0, {"tilt": 4, "lean": -1.5, "brow": -4, "handR": {"to": "headR", "dx": 62, "dy": -20}}, "smile"],
     [50, {}]
   ],
   "osc": [
