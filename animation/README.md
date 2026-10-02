@@ -79,8 +79,8 @@ The editor patches beats line by line, so keep **one beat per line** inside `bea
 | `../src/pages/AnimatePage.jsx`, `../src/animate/` | The `/dev/animate` page: loading, scene text patching, MP4 export, saving. |
 | `lib/props.mjs` | Things hands hold: goblet, marker, pen. Placeholder art. |
 | `presets/*.json` | Reusable moves: idle, wave, nod, point, shrug, hop, clap, toast. |
-| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`, `studio` (plain, spots left, centre, right). |
-| `scenes/*.mjs` | Scenes, written as data: `lasman-signing`, `preset-reel` (every preset on two bodies). |
+| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`, `studio` (plain, spots left, centre, right), `gallery` (three framed portraits, spots frameL, frameC, frameR, floor; `names` for the plates). |
+| `scenes/*.mjs` | Scenes, written as data: `lasman-signing`, `preset-reel` (every preset on two bodies), `lasmanna-predecessors` (her 2009 quote, captions verbatim from the vault). |
 | `cast-extra.json` | Placeholder looks for people with no spec in the vault yet (Cantij, the aides, Kolkov). |
 
 ## Landmarks
@@ -122,6 +122,14 @@ Beat kinds, each over a time window `t: [from, to]` with easing (`in`, `out`, de
 - `look`: `{ tilt, lean, hx, hy, brow }` blended in and out.
 - `face`: `{ mouth, eyes: 'happy' | 'closed' | 'squeeze' }`.
 - `nod`: small nods across the window.
+- `walk: x`: walks to scene x over the window, stepping and waddling.
+
+Scene-level extras:
+
+- `captions: [{ t: [from, to], text }]` for subtitles, or `style: 'title'` with `'Name\nsecond line'` for a lower-third card.
+- A cast member with `layer: 'front'` is drawn over the set's foreground (someone walking past picture frames).
+- A spot with `clip: [x0, y0, x1, y1]` keeps its character inside that rectangle (a living portrait in a frame);
+  the checker ignores that character's hands when they are outside it.
 
 Presets per character: `presets: [{ preset: 'wave', at: 2, side: 'L', size: .6, speed: .8 }]`.
 Reactions: `{ always: 'scowl' | 'smile' }`, `{ on: 'flash', do: 'flinch' | 'grin' | 'blink', from, to }`.

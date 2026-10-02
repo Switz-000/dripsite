@@ -1502,3 +1502,4 @@ tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
 .an-check li.error { border-left-color: #d62f2f; } .an-check li.warn { border-left-color: #e0a800; }
 .an-check li button { border: 0; background: none; padding: 0; text-align: left; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-accent); cursor: pointer; }
 .an-bar select { width: 100%; max-width: min(100%, 18rem); text-overflow: ellipsis; }
+.an-bar .dp-status { flex-basis: 100%; margin-top: -4px; }   /* own line, so a longer status never moves the stage */

@@ -37,10 +37,12 @@ export function checkScene(S){
     if (z <= a) add('error', b.who, a, z, `${where} ends (${z}s) before it starts (${a}s).`)
     if (a >= len) add('warn', b.who, a, z, `${where} starts at ${a}s, after the scene ends (${len}s).`)
     else if (z > len + 0.01) add('info', b.who, a, z, `${where} runs past the end of the scene (${z}s of ${len}s).`)
-    if (!b.hand && !b.sign && !b.look && !b.face && !b.nod) add('warn', b.who, a, z, `${where} has no hand, sign, look, face or nod, so it does nothing.`)
+    if (!b.hand && !b.sign && !b.look && !b.face && !b.nod && b.walk == null) add('warn', b.who, a, z, `${where} has no hand, sign, look, face, nod or walk, so it does nothing.`)
+    if (b.walk != null && (typeof b.walk !== 'number' || b.walk < -100 || b.walk > W + 100)) add('warn', b.who, a, z, `${where} walks to x=${b.walk}, outside the frame.`)
     if (b.hand && !['L','R'].includes(b.hand)) add('error', b.who, a, z, `${where}: hand must be 'L' or 'R'.`)
     if (b.hand && !b.sign && b.to == null) add('error', b.who, a, z, `${where}: a hand beat needs \`to\`.`)
   })
+  for (const c of scene.captions || []) if (!Array.isArray(c.t) || c.t[1] <= c.t[0] || c.t[0] >= len) add('warn', '', c.t?.[0] ?? 0, c.t?.[1] ?? 0, `caption "${String(c.text).slice(0, 30)}" has bad times.`)
   for (const [k, c] of Object.entries(scene.cast)) for (const p of c.presets || [])
     if (p.at != null && p.at >= len) add('warn', k, p.at, p.at, `${k}'s preset "${p.preset}" starts at ${p.at}s, after the scene ends.`)
 
@@ -76,9 +78,11 @@ export function checkScene(S){
       const ix = Math.max(0, Math.min(h.x1, W) - Math.max(h.x0, 0)), iy = Math.max(0, Math.min(h.y1, H) - Math.max(h.y0, 0))
       const off = 1 - ix*iy/area
       if (off > 0.2){ const edge = h.x0 < 0 ? 'left' : h.x1 > W ? 'right' : h.y0 < 0 ? 'top' : 'bottom'
-        flag(`${k}:headoff:${edge}`, off > 0.5 ? 'warn' : 'info', k, f, off, (v,a,z) => `${k}'s head is up to ${Math.round(v*100)}% off the ${edge} edge (${a}s to ${z}s).`) }
+        flag(`${k}:headoff:${edge}`, off > 0.5 && !S.walking?.(k, f) ? 'warn' : 'info', k, f, off, (v,a,z) => `${k}'s head is up to ${Math.round(v*100)}% off the ${edge} edge (${a}s to ${z}s).`) }
       for (const sd of ['L','R']){
         const p = W_(k, L['hand'+sd]), r = 25*P.S, key = `${k}:${sd}`
+        // a hand outside its owner's clip (a figure in a picture frame) is not drawn at all
+        if (P.clip && (p[0] < P.clip[0] - r || p[0] > P.clip[2] + r || p[1] < P.clip[1] - r || p[1] > P.clip[3] + r)) { ;(path[key] ||= []).push(p); continue }
         // hand leaving the frame
         if (p[0] < -r || p[0] > W + r || p[1] < -r || p[1] > H + r) flag(`${key}:off`, 'info', k, f, 1, (v,a,z) => `${k}'s ${sd} hand is outside the frame (${a}s to ${z}s).`)
         // hand inside furniture
@@ -91,6 +95,7 @@ export function checkScene(S){
         for (const o of cast){
           const hh = heads[o], d = Math.hypot(p[0]-hh.c[0], p[1]-hh.c[1])
           if (d > hh.r*0.75) continue
+          if (place[o].front && !P.front) continue                 // drawn behind that face, so it can't cover it
           if (o === k && aimedAtOwnHead) continue
           if (o !== k && aimedAtOther === o && HEAD_MARKS.has(b.to.to)) continue
           if (Array.isArray(b?.to)) continue                       // aimed at a scene point on purpose
