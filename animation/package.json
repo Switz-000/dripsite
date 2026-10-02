@@ -6,9 +6,17 @@
   "scripts": {
     "draft": "node --import ./lib/register.mjs lib/render.mjs --draft",
     "render": "node --import ./lib/register.mjs lib/render.mjs",
-    "cast": "node --import ./lib/register.mjs lib/cast.mjs"
+    "cast": "node --import ./lib/register.mjs lib/cast.mjs",
+    "check": "node --import ./lib/register.mjs lib/check-cli.mjs",
+    "check:portraits": "node --import ./lib/register.mjs tools/check-portraits.mjs",
+    "test:player": "node tools/test-player.mjs",
+    "words": "node tools/word-timings.mjs",
+    "test:words": "node tools/test-words.mjs"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
   }
 }

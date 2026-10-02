@@ -10,13 +10,60 @@ Separate `package.json`, so the site build never installs the renderer.
 cd animation
 npm install                                   # once: installs the resvg renderer
 npm run cast                                  # who can be animated (vault specs + placeholders)
+npm run check  -- scenes/lasman-signing.mjs   # problems in words: hands in furniture, heads off frame, jumps, bad beats
 npm run draft  -- scenes/lasman-signing.mjs   # 8 key frames on one contact sheet, seconds
 npm run render -- scenes/lasman-signing.mjs   # full MP4 in out/
 ```
 
-Options: `--frames 0,40,90` picks draft frames, `--landmarks` draws every landmark as a pink dot,
-`--audio voice.wav@1.5` adds sound starting at 1.5 s. The vault is read from `VAULT_DIR`, or from
+Draft options: `--frames 0,40,90` picks frames, `--small` makes a quarter-size sheet, `--focus lasmanna`
+crops every cell to one character, `--landmarks` draws every landmark as a pink dot.
+Render options: `--audio voice.wav@1.5` adds sound starting at 1.5 s.
+
+Safety checks, run before a pull request that touches them:
+
+```sh
+npm run check:portraits          # every vault portrait (and 300 random ones) identical to origin/main? exit 1 if not
+npm run test:player              # builds the site and drives /dev/animate in Chromium (19 checks); --export adds an MP4
+npm run test:words               # the word-timing converter
+```
+
+`test:player` needs a Chromium for playwright-core: run `npx playwright install chromium` once on a PC.
+
+## Word timings for voice lines
+
+```sh
+npm run words -- ~/tudo/projects/claude-space/kolkov-2009/audio/lines/scene_01 --prompt "Kolkov, Raroska, Troli Ustaras"
+```
+
+Writes `<take>.words.json` next to every take (skipping `raw/` folders and takes already done): each word
+with its start and end in seconds. It uses the whisper.cpp build and large-v3 model in
+`claude-space/tools/whisper.cpp` on the GPU through Vulkan (`--whisper <folder>` or `WHISPER_CPP` to use
+another). `--prompt` lists names so whisper spells them right; `--force` redoes everything. The vault is read from `VAULT_DIR`, or from
 `../../dripstao/dripwiki` next to this repo on Martín's PC.
+
+## Working in the browser
+
+Turn on **dev tools** (bottom of the sidebar) and open **Animation** (`/dev/animate`). It plays any scene in
+`animation/scenes/` live, with the same engine the command line uses.
+
+- **Play and step:** space plays, arrows step a frame, shift+arrows a second. The timeline shows each
+  character's beats (click one to jump to it and select its line) and the camera flashes.
+- **Edit:** change the scene file in the editor and the stage re-runs. Errors appear under the editor.
+  Edits are kept in this browser until you save, so a refresh never loses work. **Revert** goes back to the repo version.
+- **Drag to fix:** pause, then drag a hand. The beat driving that hand gets new `dx`/`dy` (or a new
+  `to: [x, y]` point). If no beat drives the hand at that moment, a new one-second beat is added. Signing beats
+  follow the ink and can't be dragged. Tick **Landmarks** to see every landmark (hover one for its name).
+- **New:** type a name, pick a starting point (one character, two people talking, signing at a table) and press New.
+- **Add beat:** pick a character and a snippet (hand above the head, shield the eyes, hand on someone's
+  shoulder, look at someone, lean in, recoil, nod, smile...) and it is added at the playhead, one second long.
+- **Check:** the checker runs after every change. Problems are listed under the timeline (click one to jump
+  there) and marked on the character's lane in red (errors) or yellow (warnings).
+- **Save to GitHub:** commits `animation/scenes/<name>.mjs` to dripsite with the same token the portrait
+  composer uses (it needs write access to dripsite). The site redeploys with it.
+- **Export MP4:** silent, encoded in the browser at exact 24 fps. Chrome and Edge make H.264; browsers
+  without an H.264 encoder fall back to VP9 or AV1 in the same .mp4. For sound, use `npm run render -- ... --audio`.
+
+The editor patches beats line by line, so keep **one beat per line** inside `beats: [ ... ]`.
 
 ## How it fits together
 
@@ -24,13 +71,16 @@ Options: `--frames 0,40,90` picks draft frames, `--landmarks` draws every landma
 |---|---|
 | `../src/portrait/engine.js` | `compose(spec, {anim})` draws one posed frame. `landmarks(spec, anim)` says where everything is. `handOffset()` turns a target point into a hand position. Without `anim` it draws the normal still portrait. |
 | `lib/play.mjs` | Plays presets on one character: springs, overshoot, waves, jumps, breathing, blinking. |
-| `lib/scene.mjs` | Runs a scene file: places the cast on a set, applies beats and reactions. Browser-safe, so the site can play scenes live later. |
-| `lib/render.mjs` | Draft contact sheets and full renders, in parallel across CPU cores, then ffmpeg. |
-| `lib/cast.mjs` | Reads every `portrait:` block in the vault, plus `cast-extra.json`. |
+| `lib/scene.mjs` | Runs a scene file: places the cast on a set, applies beats and reactions. Browser-safe. |
+| `lib/check.mjs` | The scene checker (browser-safe); `lib/check-cli.mjs` is `npm run check`. |
+| `lib/render.mjs`, `lib/load-node.mjs` | Draft contact sheets and full renders, in parallel across CPU cores, then ffmpeg. |
+| `tools/` | `check-portraits.mjs`, `test-player.mjs`, `word-timings.mjs`, `test-words.mjs` |
+| `lib/cast.mjs` | Reads every `portrait:` block in the vault, plus `cast-extra.json`. `lib/portrait-block.mjs` is the shared reader. |
+| `../src/pages/AnimatePage.jsx`, `../src/animate/` | The `/dev/animate` page: loading, scene text patching, MP4 export, saving. |
 | `lib/props.mjs` | Things hands hold: goblet, marker, pen. Placeholder art. |
 | `presets/*.json` | Reusable moves: idle, wave, nod, point, shrug, hop, clap, toast. |
-| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`. |
-| `scenes/*.mjs` | Scenes, written as data. |
+| `sets/*.mjs` | Backgrounds with named spots and furniture: `treaty-room`, `studio` (plain, spots left, centre, right). |
+| `scenes/*.mjs` | Scenes, written as data: `lasman-signing`, `preset-reel` (every preset on two bodies). |
 | `cast-extra.json` | Placeholder looks for people with no spec in the vault yet (Cantij, the aides, Kolkov). |
 
 ## Landmarks

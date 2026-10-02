@@ -40,6 +40,8 @@ export default {
     seatL:  { x: 430, seat: TABLE },   seatR:  { x: 850, seat: TABLE },
     standL: { x: 112, ground: 668 },   standR: { x: 1185, ground: 650 },
   },
+  // places a hand should never be drawn: the checker warns when one ends up here
+  solids: [{ name: 'the front of the table', x0: 30, y0: TABLE + 78, x1: 1250, y1: 720 }],
   docs: {
     docL: { x: 430, sig: [446, TABLE+44, 86], seed: 3, color: '#6b1d1d' },
     docR: { x: 850, sig: [752, TABLE+44, 88], seed: 8, color: '#14284f' },

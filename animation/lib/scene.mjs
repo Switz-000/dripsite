@@ -86,8 +86,9 @@ export function runScene(scene, { cast, presets, sets, assets = {}, fps } = {}){
           else if (b.to?.nib){ const d = docs[b.to.nib]; world = pointAt(d.pts, docProgress(b.to.nib, f)) }
           else if (b.to?.who){ const o = rows[b.to.who]?.[f] || null, op = place[b.to.who]
             if (!o) throw new Error(`Beat for ${k} aims at ${b.to.who}, who must be listed earlier in the cast`)
-            const L = o.landmarks[b.to.to]; world = [op.tx + L[0]*op.S, op.ty + L[1]*op.S] }
-          else fig = ctx.landmarks()[b.to]
+            const L = o.landmarks[b.to.to]; if (!L) throw new Error(`${k}'s hand beat aims at ${b.to.who}'s "${b.to.to}", which is not a landmark.`)
+            world = [op.tx + L[0]*op.S, op.ty + L[1]*op.S] }
+          else { fig = ctx.landmarks()[b.to]; if (!fig) throw new Error(`${k}'s hand beat at ${b.t[0]}s aims at "${b.to}", which is not a landmark. Landmarks: ${Object.keys(ctx.landmarks()).join(', ')}`) }
           if (world) fig = toFigure(P, world)
           if (!fig) throw new Error(`No target for ${k}'s hand beat`)
           // aim the prop's tip (pen nib, marker tip) at the point, not the hand's centre
@@ -134,5 +135,5 @@ ${fl > 0 ? `<rect width="${W}" height="${H}" fill="#fffdf4" fill-opacity="${(fl*
 ${lm}
 </svg>`
   }
-  return { N, fps, size:[W,H], frame, flashes, place, rows }
+  return { N, fps, size:[W,H], frame, flashes, place, rows, set, scene, castInfo: Object.fromEntries(order.map(k => [k, cast[scene.cast[k].who]])) }
 }

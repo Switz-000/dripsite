@@ -3,7 +3,7 @@
   "about": "Both hands up and out, head sinks and tilts, brows up. 'Who knows.'",
   "length": 42,
   "keys": [
-    [0, {"hy": 9, "tilt": -7, "brow": -9, "bh": 0.97, "bw": 1.02, "handL": {"to": "shoulderL", "dx": -55, "dy": -12}, "handR": {"to": "shoulderR", "dx": 55, "dy": -12}}, "wavy"],
+    [0, {"hy": 9, "tilt": -7, "brow": -9, "bh": 0.97, "bw": 1.02, "handL": {"to": "shoulderL", "dx": -55, "dy": -45}, "handR": {"to": "shoulderR", "dx": 55, "dy": -45}}, "wavy"],
     [34, {}]
   ]
 }
