@@ -26,7 +26,7 @@ export async function exportMp4({ frames, frameSvg, size: [W, H], fps, onProgres
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H)
     const vf = new VideoFrame(canvas, { timestamp: Math.round(f * 1e6 / fps), duration: Math.round(1e6 / fps) })
     enc.encode(vf, { keyFrame: f % (fps * 2) === 0 }); vf.close()
-    if (enc.encodeQueueSize > 8) await new Promise(r => enc.addEventListener('dequeue', r, { once: true }))
+    while (enc.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 4))     // pace by polling: older Firefox has no 'dequeue' event
     onProgress?.(f + 1, frames)
   }
   await enc.flush(); enc.close()

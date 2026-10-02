@@ -8,6 +8,7 @@
     { "source": "/chronology", "destination": "/chronology/index.html" },
     { "source": "/chronology/spans", "destination": "/chronology/spans/index.html" },
     { "source": "/search", "destination": "/spa.html" },
-    { "source": "/dev/portraits", "destination": "/spa.html" }
+    { "source": "/dev/portraits", "destination": "/spa.html" },
+    { "source": "/dev/animate", "destination": "/spa.html" }
   ]
 }

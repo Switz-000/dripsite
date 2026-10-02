@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { runScene } from '../../animation/lib/scene.mjs'
 import { PRESETS, SETS, SCENES, loadCast, loadFlags, flagUrl, flagsOf } from '../animate/assets'
 import { evalScene, beatLines, patchBeat, insertBeat } from '../animate/sceneText'
+import { checkScene, activeHandBeat } from '../../animation/lib/check.mjs'
 import { canExportMp4, exportMp4, download, saveScene } from '../animate/output'
 import { getToken, setToken } from '../portrait/vaultPortraits'
 
@@ -15,7 +16,9 @@ const store = {
   get: k => { try { return localStorage.getItem(k) } catch { return null } },
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch { /* private mode: drafts just aren't kept */ } },
 }
-const TEMPLATE = `// A new scene. Times are in seconds. See animation/README.md for every option.
+/* starting points for the New button */
+const TEMPLATES = {
+  'One character (studio)': `// A new scene. Times are in seconds. See animation/README.md for every option.
 export default {
   length: 4,
   set: { use: 'studio' },
@@ -25,7 +28,58 @@ export default {
   beats: [
   ],
 }
-`
+`,
+  'Two people talking (studio)': `// Two people facing each other. Lean and head tilt sell who is talking to whom.
+export default {
+  length: 6,
+  set: { use: 'studio' },
+  cast: {
+    left:  { who: 'Boris Serec', spot: 'left', presets: [{ preset: 'idle' }, { preset: 'point', at: 1.5, side: 'R', size: .7 }] },
+    right: { who: 'Grawolja Lasmanna', spot: 'right', presets: [{ preset: 'idle' }, { preset: 'shrug', at: 4 }] },
+  },
+  beats: [
+    { who: 'left', t: [0, 3.5], look: { tilt: 4, lean: 1.5, hx: 3 }, face: { mouth: 'open' } },
+    { who: 'right', t: [0, 3.5], look: { tilt: -3, hx: -2 } },
+    { who: 'right', t: [3.5, 6], look: { tilt: -5, lean: -1.5, hx: -3 }, face: { mouth: 'wavy' } },
+    { who: 'left', t: [3.8, 5], nod: 1 },
+  ],
+}
+`,
+  'Signing at a table (treaty room)': `// Two signers at the treaty-room table. Swap the people and flags.
+export default {
+  length: 6,
+  set: { use: 'treaty-room', flags: ['Susia', 'Confia', 'Susia', 'Confia', 'Susia'] },
+  cast: {
+    left:  { who: 'Grawolja Lasmanna', spot: 'seatL', nudge: [0, -22], props: { R: 'pen' } },
+    right: { who: 'Boris Serec', spot: 'seatR', props: { L: 'pen' } },
+  },
+  beats: [
+    { who: 'left',  t: [0.3, 6],   hand: 'L', to: [352, 500] },
+    { who: 'left',  t: [1, 4],     sign: 'docL', hand: 'R' },
+    { who: 'left',  t: [1, 4],     look: { tilt: 5, lean: 2, hy: 6 } },
+    { who: 'right', t: [0.3, 6],   hand: 'R', to: [948, 500] },
+    { who: 'right', t: [1.5, 4.5], sign: 'docR', hand: 'L' },
+    { who: 'right', t: [1.5, 4.5], look: { tilt: -4, hy: 6, lean: -1.5 } },
+  ],
+}
+`,
+}
+const TEMPLATE = TEMPLATES['One character (studio)']
+/* beat lines the Add beat menu inserts at the playhead (one second long; adjust in the editor) */
+const SNIPPETS = {
+  'Hand above the head':        (w, o, t) => `{ who: '${w}', t: ${t}, hand: 'R', to: 'headTop', dx: 40, dy: -40 }`,
+  'Hand to the chest':          (w, o, t) => `{ who: '${w}', t: ${t}, hand: 'R', to: 'chest', dx: 30, dy: 0 }`,
+  'Shield the eyes':            (w, o, t) => `{ who: '${w}', t: ${t}, hand: 'L', to: 'brow', dx: -12, dy: -18 }`,
+  'Hand to the mouth':          (w, o, t) => `{ who: '${w}', t: ${t}, hand: 'L', to: 'mouth', dx: 12, dy: 18 }`,
+  "Hand on someone's shoulder": (w, o, t) => o ? `{ who: '${w}', t: ${t}, hand: 'L', to: { who: '${o}', to: 'shoulderR' } }` : null,
+  'Look at someone':            (w, o, t, dir) => o ? `{ who: '${w}', t: ${t}, look: { tilt: ${4*dir}, lean: ${1.5*dir}, hx: ${3*dir} } }` : null,
+  'Lean in':                    (w, o, t) => `{ who: '${w}', t: ${t}, look: { lean: 3, hy: 4, brow: 2 } }`,
+  'Recoil':                     (w, o, t) => `{ who: '${w}', t: ${t}, look: { lean: -3, tilt: -4, hy: -3, brow: -6 }, face: { mouth: 'open' } }`,
+  'Nod':                        (w, o, t) => `{ who: '${w}', t: ${t}, nod: 1 }`,
+  'Smile':                      (w, o, t) => `{ who: '${w}', t: ${t}, face: { mouth: 'smile' } }`,
+  'Happy eyes':                 (w, o, t) => `{ who: '${w}', t: ${t}, face: { mouth: 'smile', eyes: 'happy' } }`,
+  'Eyes shut':                  (w, o, t) => `{ who: '${w}', t: ${t}, face: { eyes: 'closed' } }`,
+}
 const KIND_COLOURS = { hand: '#2f6db5', sign: '#7a3fb0', look: '#b5832f', face: '#2f9a6b', nod: '#b5402f' }
 const kindOf = b => b.sign ? 'sign' : b.hand ? 'hand' : b.look ? 'look' : b.face ? 'face' : b.nod ? 'nod' : 'look'
 const fmt = s => s.toFixed(2) + 's'
@@ -59,6 +113,10 @@ export default function AnimatePage() {
   const [exporting, setExporting] = useState(null)  // { done, total, abort }
   const [token, setTok] = useState(() => getToken())
   const [newName, setNewName] = useState('')
+  const [template, setTemplate] = useState(Object.keys(TEMPLATES)[0])
+  const [snipWho, setSnipWho] = useState('')
+  const [snipKind, setSnipKind] = useState(Object.keys(SNIPPETS)[0])
+  const [showInfo, setShowInfo] = useState(false)
   const stageRef = useRef(null), overlayRef = useRef(null), editorRef = useRef(null)
   const flagMode = useRef('blob'), runSeq = useRef(0)
 
@@ -148,11 +206,14 @@ export default function AnimatePage() {
   }, [runner])
 
   /* ---------- editor helpers ---------- */
-  function selectLine(i) {
+  /* shows a line in the editor; `focus` moves the keyboard there too (only when the person asked for the
+     editor, e.g. by clicking a beat), so space and the arrows keep driving playback after a drag */
+  function selectLine(i, focus = false) {
     const ta = editorRef.current; if (!ta || i < 0) return
     const lines = ta.value.split('\n'); let a = 0
     for (let k = 0; k < i; k++) a += lines[k].length + 1
-    ta.focus(); ta.setSelectionRange(a, a + lines[i].length)
+    if (focus) ta.focus()
+    ta.setSelectionRange(a, a + lines[i].length)
     const lh = parseFloat(getComputedStyle(ta).lineHeight) || 16
     ta.scrollTop = Math.max(0, i * lh - ta.clientHeight / 3)
   }
@@ -160,16 +221,15 @@ export default function AnimatePage() {
     if (!runner) return
     setSelected(i)
     const lines = beatLines(text, runner.scene.beats.length)
-    if (lines) selectLine(lines[i])
+    if (lines) selectLine(lines[i], true)
   }
 
   /* ---------- stage geometry ---------- */
   const fig2world = (k, [x, y]) => { const P = runner.S.place[k]; return [P.tx + x * P.S, P.ty + y * P.S] }
   function toScene(e) {
     const svg = overlayRef.current; if (!svg) return null
-    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY
     const m = svg.getScreenCTM(); if (!m) return null
-    const p = pt.matrixTransform(m.inverse()); return [p.x, p.y]
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse()); return [p.x, p.y]
   }
   function handAt(p) {
     if (!runner || !p) return null
@@ -182,24 +242,11 @@ export default function AnimatePage() {
     }
     return best
   }
-  /* the beat that currently drives this hand: the last one listed that covers this frame */
-  function activeHandBeat(k, sd) {
-    const fps = runner.S.fps, beats = runner.scene.beats
-    let idx = -1
-    beats.forEach((b, i) => {
-      if (b.who !== k) return
-      const hand = b.sign ? (b.hand || 'R') : b.hand
-      if (hand !== sd) return
-      const a = Math.round(b.t[0] * fps), z = Math.round(b.t[1] * fps), out = Math.round((b.out ?? .25) * fps)
-      if (f >= a && f < z + out) idx = i
-    })
-    return idx
-  }
-
   function onPointerDown(e) {
     const p = toScene(e), h = handAt(p)
     if (!h) return
     e.preventDefault(); overlayRef.current.setPointerCapture(e.pointerId)
+    if (document.activeElement?.closest?.('textarea, input, select')) document.activeElement.blur()   // keys go back to playback
     setPlaying(false)
     setDrag({ ...h, start: p, now: p })
   }
@@ -214,7 +261,7 @@ export default function AnimatePage() {
     const world = [d.now[0] - d.start[0], d.now[1] - d.start[1]]
     if (Math.hypot(...world) < 2) return
     const S = runner.S.place[d.k].S, fig = [world[0] / S, world[1] / S]
-    const i = activeHandBeat(d.k, d.sd)
+    const i = activeHandBeat(runner.scene, runner.S.fps, d.k, d.sd, f)
     let r
     if (i >= 0) r = patchBeat(text, runner.scene.beats, i, { world, fig })
     else {
@@ -246,7 +293,7 @@ export default function AnimatePage() {
       const blob = await exportMp4({ frames: runner.S.N, fps: runner.S.fps, size: runner.S.size, frameSvg: k => runner.S.frame(k),
         signal: ctrl.signal, onProgress: (done, total) => setExporting(x => x && { ...x, done, total }) })
       download(blob, `${name}.mp4`)
-      flash(`Exported ${name}.mp4 (${blob.codecLabel}, ${(blob.size / 1e6).toFixed(1)} MB, no sound)${blob.codecLabel === 'H.264' ? '' : '. This browser has no H.264 encoder, so it used ' + blob.codecLabel + '; for the most compatible file use Chrome or `npm run render`'}.`, 9000)
+      flash(`Exported ${name}.mp4 (${blob.codecLabel}, ${(blob.size / 1e6).toFixed(1)} MB, no sound)${blob.codecLabel === 'H.264' ? '' : '. This browser has no H.264 encoder, so it used ' + blob.codecLabel + '; for the most compatible file use `npm run render`'}.`, 9000)
     } catch (e) { if (e.name !== 'AbortError') flash(String(e.message || e), 9000); else flash('Export cancelled.') }
     finally { flagMode.current = 'blob'; setExporting(null) }
   }
@@ -256,13 +303,31 @@ export default function AnimatePage() {
     if (!n) return
     if (savedNames.includes(n) || newNames.includes(n)) { flash(`There is already a scene called ${n}.`); return }
     const list = [...newNames, n]; setNewNames(list); store.set(NEW_SCENES, JSON.stringify(list))
-    store.set(DRAFT(n), TEMPLATE); setNewName(''); setName(n)
+    store.set(DRAFT(n), TEMPLATES[template] || TEMPLATE); setNewName(''); setName(n)
   }
   function onRevert() {
     if (!isSaved) return
     store.set(DRAFT(name), null); setText(SCENES[name]); flash('Back to the version in the repo.')
   }
   const dirty = isSaved ? text !== SCENES[name] : true
+
+  /* the checker runs after every re-run; problems show under the timeline and on the lanes */
+  const issues = useMemo(() => { try { return runner ? checkScene(runner.S) : [] } catch (e) { return [{ level: 'error', who: '', from: 0, to: 0, msg: 'The checker failed: ' + e.message }] } }, [runner])
+  const counts = { error: issues.filter(i => i.level === 'error').length, warn: issues.filter(i => i.level === 'warn').length, info: issues.filter(i => i.level === 'info').length }
+
+  function onAddBeat() {
+    if (!runner) return
+    const keys = Object.keys(runner.scene.cast), who = keys.includes(snipWho) ? snipWho : keys[0]
+    const other = keys.find(k => k !== who)
+    const t0 = Math.round(f / runner.S.fps * 100) / 100, t1 = Math.min(runner.scene.length, Math.round((t0 + 1) * 100) / 100)
+    const dir = other ? Math.sign(runner.S.place[other].tx - runner.S.place[who].tx) || 1 : 1
+    const line = SNIPPETS[snipKind](who, other, `[${t0}, ${t1}]`, dir)
+    if (!line) { flash('That one needs a second character in the scene.'); return }
+    const r = insertBeat(text, runner.scene.beats, line)
+    if (r.error) { flash(r.error, 7000); return }
+    setText(r.text); flash(`Added "${snipKind}" for ${who} from ${t0}s to ${t1}s.`)
+    setTimeout(() => selectLine(r.line), 0)
+  }
 
   /* ---------- render ---------- */
   const S = runner?.S, N = S?.N || 1, fps = S?.fps || 24
@@ -287,6 +352,9 @@ export default function AnimatePage() {
         </label>
         <form className="an-field" onSubmit={onNew}>
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="new-scene-name" aria-label="New scene name" />
+          <select value={template} onChange={e => setTemplate(e.target.value)} aria-label="Start from">
+            {Object.keys(TEMPLATES).map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
           <button className="dp-btn dp-btn-quiet" type="submit" disabled={!newName.trim()}>New</button>
         </form>
         <span className="dp-status" role="status">{loading || (dirty ? 'Unsaved changes (kept in this browser)' : 'Same as the repo')}</span>
@@ -338,6 +406,9 @@ export default function AnimatePage() {
                       {(c.presets || []).filter(p => p.at != null).map((p, i) => (
                         <span key={'p' + i} className="an-preset" style={{ left: pct(p.at) }} title={`preset ${p.preset} at ${p.at}s`}>{p.preset}</span>
                       ))}
+                      {issues.filter(x => x.who === k && x.level !== 'info' && x.to >= x.from).map((x, j) => (
+                        <span key={'x' + j} className={'an-issue ' + x.level} style={{ left: pct(x.from), width: `max(3px, ${pct(Math.max(0, x.to - x.from))})` }} title={x.msg} />
+                      ))}
                       {mine.map(([b, i]) => (
                         <button key={i} type="button" className={'an-beat' + (selected === i ? ' on' : '')}
                           style={{ left: pct(b.t[0]), top: 3 + row.get(i) * 13, width: `calc(${pct(Math.max(.05, b.t[1] - b.t[0]))} - 1px)`, background: KIND_COLOURS[kindOf(b)] }}
@@ -357,7 +428,36 @@ export default function AnimatePage() {
               <div className="an-legend">{Object.entries(KIND_COLOURS).map(([k, c]) => <span key={k}><i style={{ background: c }} />{k}</span>)}<span>* placeholder look</span></div>
             </div>
           )}
+          {runner && (
+            <div className="an-tools">
+              <label className="an-field">Add beat
+                <select value={snipWho || castKeys[0]} onChange={e => setSnipWho(e.target.value)} aria-label="Character">
+                  {castKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+                <select value={snipKind} onChange={e => setSnipKind(e.target.value)} aria-label="Beat">
+                  {Object.keys(SNIPPETS).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </label>
+              <button className="dp-btn dp-btn-quiet" type="button" onClick={onAddBeat}>Add at {fmt(f / fps)}</button>
+            </div>
+          )}
           {status && <p className="an-note" role="status">{status}</p>}
+          {runner && (
+            <section className="an-check" aria-label="Scene check">
+              <h2>Check <span className={counts.error ? 'bad' : counts.warn ? 'meh' : 'ok'}>
+                {counts.error || counts.warn ? `${counts.error} errors, ${counts.warn} warnings` : 'no problems'}</span>
+                {counts.info > 0 && <button type="button" className="an-linkbtn" onClick={() => setShowInfo(v => !v)}>{showInfo ? 'hide' : 'show'} {counts.info} notes</button>}
+              </h2>
+              <ul>
+                {issues.filter(x => x.level !== 'info' || showInfo).map((x, j) => (
+                  <li key={j} className={x.level}>
+                    <button type="button" onClick={() => { setPlaying(false); setF(Math.min(N - 1, Math.round(x.from * fps))) }}>{x.from.toFixed(2)}s</button>
+                    <span>{x.msg}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <div className="dp-panel an-panel">

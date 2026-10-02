@@ -135,5 +135,5 @@ ${fl > 0 ? `<rect width="${W}" height="${H}" fill="#fffdf4" fill-opacity="${(fl*
 ${lm}
 </svg>`
   }
-  return { N, fps, size:[W,H], frame, flashes, place, rows }
+  return { N, fps, size:[W,H], frame, flashes, place, rows, set, scene, castInfo: Object.fromEntries(order.map(k => [k, cast[scene.cast[k].who]])) }
 }
