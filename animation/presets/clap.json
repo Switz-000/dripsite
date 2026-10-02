@@ -1,0 +1,13 @@
+{
+  "name": "clap",
+  "about": "Applause: both hands come together in front of the chest and clap, grinning.",
+  "length": 52,
+  "keys": [
+    [0, {"front": 1, "brow": -5, "happy": 1, "tilt": 2, "handL": {"to": "chest", "dx": -27, "dy": -5}, "handR": {"to": "chest", "dx": 27, "dy": -5}}, "smile"],
+    [44, {}]
+  ],
+  "osc": [
+    {"p": "lx", "amp": -22, "hz": 3.2, "from": 8, "to": 40, "shape": "abs"},
+    {"p": "rx", "amp": 22, "hz": 3.2, "from": 8, "to": 40, "shape": "abs"}
+  ]
+}

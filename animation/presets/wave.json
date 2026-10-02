@@ -1,0 +1,13 @@
+{
+  "name": "wave",
+  "about": "Raises the leading hand to head height and waves it side to side.",
+  "length": 60,
+  "keys": [
+    [0, {"tilt": 4, "lean": -1.5, "brow": -4, "handR": {"to": "headR", "dx": 40, "dy": -15}}, "smile"],
+    [50, {}]
+  ],
+  "osc": [
+    {"p": "rx", "amp": 16, "hz": 2.6, "from": 8, "to": 50},
+    {"p": "ry", "amp": -4, "hz": 5.2, "from": 8, "to": 50, "shape": "abs"}
+  ]
+}

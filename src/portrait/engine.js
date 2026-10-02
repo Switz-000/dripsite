@@ -71,7 +71,8 @@ const BROWS = { none:null, ...BASE.brows };
    Everything is painted inside the torso except the lapels, and every edge gets a small
    hand-drawn wobble (fixed seed, so the same suit always looks the same). */
 /* hand wobble: a seeded random walk (slow drift + small jitter), not a sine, so it reads as a hand not a wave */
-function rng(seed){ let a=seed*9301+49297; return ()=>{ a=(a*9301+49297)%233280; return a/233280; }; }
+let BOIL=0;   // animation only: reseeds the suit wobble every few frames so lines "boil" like hand-drawn animation
+function rng(seed){ seed+=BOIL*31; let a=seed*9301+49297; return ()=>{ a=(a*9301+49297)%233280; return a/233280; }; }
 function wob(pts, closed=true, amp=1.0, seed=1){
   const R=rng(seed), out=[], n=pts.length, segs=closed?n:n-1;
   let drift=0, vel=0;
@@ -147,20 +148,79 @@ export const SWATCHES = {
 };
 export const DEFAULT_SPEC = { outfit:'none', brows:'none', eyes:'dot', eyeliner:'none', nose:'hook', mouth:'line', hair:'none', eyewear:'none', extras:[], facial:[], shape:{headW:1,headH:1,bodyW:1,bodyH:1}, palette:{skin:'#ffffff', hair:'#6b4a2e', facial:'#6b4a2e', frames:'#41230a', outfit:'#ffffff', suit:'#09135e', shirt:'#ceedf4', tie:'#ed1c24'} };
 
-/* ---------- Compose ---------- */
-export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
-  const s=normalizeSpec(spec), showAnchors=anchors, ID=String(id).replace(/[^A-Za-z0-9_-]/g,'')+'-';
-  const p=s.palette, sh=s.shape;
+/* ---------- Geometry shared by compose() and landmarks() ---------- */
+const bboxCentre = d => { const n=(d.match(/-?\d*\.?\d+/g)||[]).map(Number), xs=n.filter((_,i)=>i%2===0), ys=n.filter((_,i)=>i%2===1);
+  return [(Math.min(...xs)+Math.max(...xs))/2, (Math.min(...ys)+Math.max(...ys))/2]; };
+const HAND_C = { L: bboxCentre(BASE.handL), R: bboxCentre(BASE.handR) };
+export const HAND_R = 25;                        // a hand is about this radius; aim its centre this far clear of a target
+/* half-width of the drawn torso at a given height, read off the body outline once */
+const BODY_PTS = (()=>{ const n=(BASE.body.d.match(/-?\d*\.?\d+/g)||[]).map(Number); const o=[]; for(let i=0;i+1<n.length;i+=2) o.push([n[i],n[i+1]]); return o; })();
+const halfWidth = y => { let w=0; for(const [x,py] of BODY_PTS) if(Math.abs(py-y)<18) w=Math.max(w,Math.abs(x-200)); return w||TORSO_HALF; };
+const FEET = (()=>{ const n=(BASE.legs.match(/-?\d*\.?\d+/g)||[]).map(Number), pts=[]; for(let i=0;i+1<n.length;i+=2) pts.push([n[i],n[i+1]]);
+  const low=pts.filter(p=>p[1]>700); return { L:low.filter(p=>p[0]<200).reduce((a,p)=>a[1]>p[1]?a:p,[160,711]), R:low.filter(p=>p[0]>200).reduce((a,p)=>a[1]>p[1]?a:p,[240,711]) }; })();
+function geom(s, a){
+  const sh=s.shape, HX=a.hx||0, HY=a.hy||0, CX=200+HX;
   const grow=(sh.bodyH-1)*(TORSO_BOT-TORSO_TOP);            // torso grows upward; feet stay on the ground
+  const upY=y=>CHIN+(y-CHIN)*sh.headH-grow+HY;
+  const gap=EYE_GAP*sh.headW, eyeY=upY(200), xl=CX-gap/2, xr=CX+gap/2;
+  const handDx=(sh.bodyW-1)*TORSO_HALF, handDy=-grow*0.45;
+  return { sh, HX, HY, CX, grow, upY, gap, eyeY, xl, xr, handDx, handDy, pivotHead:[CX, CHIN-grow+HY], pivotLean:[200, TORSO_BOT] };
+}
+const rot = ([x,y],deg,[cx,cy]) => { if(!deg) return [x,y]; const t=deg*Math.PI/180, c=Math.cos(t), s=Math.sin(t);
+  return [cx+(x-cx)*c-(y-cy)*s, cy+(x-cx)*s+(y-cy)*c]; };
+
+/* Landmarks: where things are on this character in this frame, after the frame's head tilt,
+   lean and jump, in the portrait's own coordinates (the 480x770 figure space). Animations aim
+   at these ("hand 40 above headTop") instead of raw numbers, so one gesture fits every body. */
+export function landmarks(spec, anim={}){
+  const s=normalizeSpec(spec), a=anim||{}, g=geom(s,a), sh=g.sh;
+  const head=pt=>rot(rot(pt,a.tilt||0,g.pivotHead),a.lean||0,g.pivotLean), body=pt=>rot(pt,a.lean||0,g.pivotLean);
+  const mv=([x,y])=>[x+(a.jx||0), y+(a.jy||0)];
+  const by=y=>TORSO_BOT+(y-TORSO_BOT)*sh.bodyH, bx=x=>200+(x-200)*sh.bodyW;
+  const top=by(TORSO_TOP), H=TORSO_BOT-top, raw=k=>TORSO_TOP+k*(TORSO_BOT-TORSO_TOP);
+  const M=PARTS.mouth[s.mouth];
+  const L={}, H_=(k,p)=>L[k]=mv(head(p)), B_=(k,p)=>L[k]=mv(body(p));
+  H_('headTop',[g.CX, g.upY(HEAD.cy-HEAD.ry)]); H_('headL',[g.CX-HEAD.rx*sh.headW, g.upY(HEAD.cy)]); H_('headR',[g.CX+HEAD.rx*sh.headW, g.upY(HEAD.cy)]);
+  H_('eyeL',[g.xl,g.eyeY]); H_('eyeR',[g.xr,g.eyeY]); H_('brow',[g.CX,g.eyeY-15]); H_('nose',[g.CX,g.upY(222)]);
+  H_('mouth',[g.CX,g.upY(264)]); H_('cig',[g.CX+M.cig[0], g.upY(264)+M.cig[1]]); H_('chin',g.pivotHead);
+  B_('neck',[200,top]);
+  B_('shoulderL',[bx(200-halfWidth(raw(.14))), top+.14*H]); B_('shoulderR',[bx(200+halfWidth(raw(.14))), top+.14*H]);
+  B_('chest',[200, top+.3*H]); B_('waist',[200, top+.62*H]); B_('hips',[200, TORSO_BOT-.08*H]);
+  B_('sideL',[bx(200-halfWidth(raw(.62))), top+.62*H]); B_('sideR',[bx(200+halfWidth(raw(.62))), top+.62*H]);
+  for(const sd of ['L','R']){ const r=[HAND_C[sd][0]+(sd==='L'?-g.handDx:g.handDx), HAND_C[sd][1]+g.handDy], h=a['hand'+sd]||{};
+    B_('rest'+sd, r); B_('hand'+sd, [r[0]+(h.x||0), r[1]+(h.y||0)]); }
+  L.footL=mv(FEET.L); L.footR=mv(FEET.R); L.ground=mv([200,712]);
+  return L;
+}
+export const LANDMARKS = ['headTop','headL','headR','eyeL','eyeR','brow','nose','mouth','cig','chin','neck','shoulderL','shoulderR','chest','waist','hips','sideL','sideR','restL','restR','handL','handR','footL','footR','ground'];
+/* The hand offset (anim.handL/handR x,y) that puts that hand's centre on `target`, a point in
+   figure space as landmarks() reports it. Undoes the frame's jump and lean first. */
+export function handOffset(spec, anim, side, target){
+  const s=normalizeSpec(spec), a=anim||{}, g=geom(s,a);
+  const t=rot([target[0]-(a.jx||0), target[1]-(a.jy||0)], -(a.lean||0), g.pivotLean);
+  const r=[HAND_C[side][0]+(side==='L'?-g.handDx:g.handDx), HAND_C[side][1]+g.handDy];
+  return [t[0]-r[0], t[1]-r[1]];
+}
+
+/* ---------- Compose ---------- */
+/* `anim` (optional) poses the figure for one animation frame; without it the output is the still portrait.
+   anim: { hx, hy: head offset   tilt: head degrees   lean: torso degrees (pivots at the hips)
+           jx, jy: whole figure offset (jumps)   legs: leg length factor   blink: 1 closed, 2 squeezed, 3 happy arcs
+           browL, browR: brow offsets   boil: suit wobble reseed   extra(A): svg drawn with the head
+           handL, handR: { x, y offset from rest, r degrees, prop: svg gripped by the hand, front: draw over the body }
+           layer: 'body' (no hands) | 'hands' (hands only), for figures seated behind furniture } */
+export function compose(spec, { anchors=false, id='p', frame='full', anim=null } = {}){
+  const s=normalizeSpec(spec), showAnchors=anchors, ID=String(id).replace(/[^A-Za-z0-9_-]/g,'')+'-';
+  const p=s.palette, sh=s.shape, a=anim||{};
+  BOIL=a.boil||0;
+  const G=geom(s,a), {HX,HY,CX,grow,upY,eyeY,xl,xr}=G;
   const BD=about(sh.bodyW, sh.bodyH, 200, TORSO_BOT);
-  const UP=about(sh.headW, sh.headH, 200, CHIN, 0, -grow);
-  const upY=y=>CHIN+(y-CHIN)*sh.headH-grow;
-  const gap=EYE_GAP*sh.headW, eyeY=upY(200), xl=200-gap/2, xr=200+gap/2;
+  const UP=about(sh.headW, sh.headH, 200, CHIN, HX, -grow+HY);
   const A = { eyeL:[xl,eyeY], eyeR:[xr,eyeY], browL:[xl,eyeY-15], browR:[xr,eyeY-15],
-              nose:[200,upY(222)], mouth:[200,upY(264)], hat:[200,upY(HEAD.cy-HEAD.ry*0.55)] };
+              nose:[CX,upY(222)], mouth:[CX,upY(264)], hat:[CX,upY(HEAD.cy-HEAD.ry*0.55)] };
   const M=PARTS.mouth[s.mouth]; A.cig=[A.mouth[0]+M.cig[0], A.mouth[1]+M.cig[1]];
-  A.brow=[200,eyeY-15]; A.cheekL=[xl,A.mouth[1]]; A.cheekR=[xr,A.mouth[1]];
-  A.chin=[200, CHIN-grow];
+  A.brow=[CX,eyeY-15]; A.cheekL=[xl,A.mouth[1]]; A.cheekR=[xr,A.mouth[1]];
+  A.chin=[CX, CHIN-grow+HY];
   /* three kinds of hair: 'clip' sits inside the head, 'volume' is drawn over it, 'long' adds a back layer behind it */
   const HR = HAIRS[s.hair];
   /* outer silhouette of hair = body line weight; lines that fall over the face (bangs) keep Martín's thinner weight */
@@ -178,27 +238,41 @@ export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
   const facial = s.facial.map(n=>{ const f=FACIAL[n], [x,y]=A[f.anchor];
     return move(`<path d="${f.fill}" fill="${p.facial}"/><path d="${f.ink}" fill="${shade(p.facial)}" fill-rule="evenodd"/>`, x-f.o[0], y-f.o[1]); }).join('');
   const extras = s.extras.map(n=> BASE.extras[n].map(pc=> onAnchor(pc, ...A[pc.anchor], EXTRA_GREY)).join('')).join('');
-  const handDx=(sh.bodyW-1)*TORSO_HALF, handDy=-grow*0.45;
+  const {handDx, handDy}=G;
+  const f1=v=>(+v).toFixed(1);
+  const handArt=(sd,dx,dy)=>{ const h=a['hand'+sd]||{}, X=dx+(h.x||0), Y=dy+(h.y||0), art=move(`<path d="${BASE['hand'+sd]}" fill="${p.skin}" ${ST()}/>`, X, Y);
+    if(!anim) return art;
+    const c=[HAND_C[sd][0]+X, HAND_C[sd][1]+Y];
+    return `<g transform="rotate(${(h.r||0).toFixed(2)} ${f1(c[0])} ${f1(c[1])})">${h.prop?`<g transform="translate(${f1(c[0])} ${f1(c[1])})">${h.prop}</g>`:''}${art}</g>`; };
+  const handBack=sd=> a.layer==='body' || (a['hand'+sd]||{}).front ? '' : handArt(sd, sd==='L'?-handDx:handDx, handDy);
+  const handFront=sd=> a.layer==='body' || !(a['hand'+sd]||{}).front ? '' : handArt(sd, sd==='L'?-handDx:handDx, handDy);
+  const OPEN_MOVE = anim ? `<g transform="translate(${f1(a.jx||0)} ${f1(a.jy||0)})">` : '';
+  const OPEN_LEAN = anim ? `<g transform="rotate(${(a.lean||0).toFixed(2)} 200 ${TORSO_BOT})">` : '';
+  const OPEN_HEAD = anim ? `<g transform="rotate(${(a.tilt||0).toFixed(2)} ${f1(G.pivotHead[0])} ${f1(G.pivotHead[1])})">` : '';
+  const CLOSE = anim ? `${a.extra ? a.extra(A) : ''}</g>${handFront('L')}${handFront('R')}</g></g>` : '';
+  const closedEyes = k => [xl,xr].map(x=>`<path d="M${f1(x-8)} ${f1(eyeY+(k>2?3:k>1?1:0))} Q${f1(x)} ${f1(eyeY+(k>2?-6:3))} ${f1(x+8)} ${f1(eyeY+(k>2?3:k>1?1:0))}" fill="none" stroke="${K}" stroke-width="3" stroke-linecap="round"/>`).join('');
   const E=PARTS.eyes[s.eyes];
   const dot=(x,y)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="#d6336c" stroke="#fff" stroke-width="1.2"/>`;
   const overlay = showAnchors ? `<g>
     <path d="M${(A.browL[0]-26).toFixed(1)} ${A.browL[1].toFixed(1)} L${(A.browR[0]+26).toFixed(1)} ${A.browR[1].toFixed(1)}" stroke="#d6336c" stroke-width="1" stroke-dasharray="3 3" fill="none"/>
     <path d="M${(200-HEAD.rx*sh.headW*0.8).toFixed(1)} ${A.hat[1].toFixed(1)} L${(200+HEAD.rx*sh.headW*0.8).toFixed(1)} ${A.hat[1].toFixed(1)}" stroke="#d6336c" stroke-width="1" stroke-dasharray="3 3" fill="none"/>
     ${[A.eyeL,A.eyeR,A.browL,A.browR,A.nose,A.mouth,A.cig,A.hat,A.chin].map(a=>dot(...a)).join('')}</g>` : '';
+  const VIEW = frame==='face' ? `50 ${(32-grow).toFixed(1)} 300 330` : frame==='bust' ? `-20 ${(-75-grow).toFixed(1)} 440 484` : '-40 -40 480 770';
+  if(a.layer==='hands') return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW}">${OPEN_MOVE}${OPEN_LEAN}${handArt('L',-handDx,handDy)}${handArt('R',handDx,handDy)}</g></g></svg>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${frame==='face' ? `50 ${(32-grow).toFixed(1)} 300 330` : frame==='bust' ? `-20 ${(-75-grow).toFixed(1)} 440 484` : '-40 -40 480 770'}" role="img" aria-label="Portrait">
   <defs>${headIn}${headOut}<clipPath id="${ID}bodyclip">${bake(`<path d="${BASE.body.d}"/>`, ...BD)}</clipPath></defs>
-  ${hairBack}
-  ${bake(`<path d="${BASE.legs}" ${ST()} fill="none"/>`, ...about(Math.sqrt(sh.bodyW),1,200,0))}
-  ${move(`<path d="${BASE.handL}" fill="${p.skin}" ${ST()}/>`, -handDx, handDy)}
-  ${move(`<path d="${BASE.handR}" fill="${p.skin}" ${ST()}/>`, handDx, handDy)}
+  ${anim?'':hairBack}
+  ${OPEN_MOVE}${bake(`<path d="${BASE.legs}" ${ST()} fill="none"/>`, ...(anim ? about(Math.sqrt(sh.bodyW),a.legs||1,200,712) : about(Math.sqrt(sh.bodyW),1,200,0)))}
+  ${OPEN_LEAN}${anim?hairBack:''}${handBack('L')}
+  ${handBack('R')}
   ${ OUTFITS[s.outfit] ? bake(OUTFITS[s.outfit](p,ID), ...BD)
     : bake(`<path d="${BASE.body.d}" fill="${p.outfit}" ${ST()}/>`, ...BD) }
-  ${bake(`<path d="${HEAD.d}" fill="${p.skin}"/>`, ...UP)}
+  ${OPEN_HEAD}${bake(`<path d="${HEAD.d}" fill="${p.skin}"/>`, ...UP)}
   ${hairClip}
   ${outlineMask}<g ${outlineMask?`mask="url(#${ID}om)"`:''}>${bake(`<path d="${HEAD.d}" fill="none" ${ST()}/>`, ...UP)}</g>
   ${hairFront}
   ${extras}
-  ${E.draw(xl,eyeY,-1)}${E.draw(xr,eyeY,1)}
+  ${a.blink ? closedEyes(a.blink) : E.draw(xl,eyeY,-1)+E.draw(xr,eyeY,1)}
   ${PARTS.eyeliner[s.eyeliner] ? PARTS.eyeliner[s.eyeliner].draw(xl,eyeY,-1)+PARTS.eyeliner[s.eyeliner].draw(xr,eyeY,1) : ''}
   ${NOSES[s.nose](...A.nose)}
   ${(()=>{ const Bw=BROWS[s.brows]; if(!Bw) return '';
@@ -208,12 +282,12 @@ export function compose(spec, { anchors=false, id='p', frame='full' } = {}){
       return ['L','R'].map(sd=>{ const b=Bw[sd], [x,y]=sd==='L'?A.browL:A.browR;
         const art = b.shape ? `<path d="${b.shape}" fill="${p.facial}" stroke="${shade(p.facial)}" stroke-width="2.2" stroke-linejoin="round"/>`
           : `${b.fill?`<path d="${b.fill}" fill="${p.facial}"/>`:''}<path d="${b.ink}" fill="${shade(p.facial, b.fill?0.62:0.45)}" fill-rule="evenodd"/>`;
-        return move(art, x-b.o[0], y-lift-b.o[1]); }).join(''); })()}
+        return move(art, x-b.o[0], y-lift-b.o[1]+((sd==='L'?a.browL:a.browR)||0)); }).join(''); })()}
   ${M.draw(...A.mouth)}
   ${facial}
   ${hairVolume}
   ${EYEWEAR[s.eyewear] ? EYEWEAR[s.eyewear].side(xl,eyeY,-1,p)+EYEWEAR[s.eyewear].side(xr,eyeY,1,p)+EYEWEAR[s.eyewear].bridge(xl,xr,eyeY,p) : ''}
-  ${overlay}
+  ${CLOSE}${overlay}
 </svg>`;
 }
 

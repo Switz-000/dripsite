@@ -1,0 +1,13 @@
+{
+  "name": "point",
+  "about": "Leans in and jabs the leading hand outward twice. Making a point.",
+  "length": 34,
+  "keys": [
+    [0, {"lean": 3.5, "tilt": 2, "hx": 3, "brow": 3, "lx": 8, "ly": 10, "handR": {"to": "shoulderR", "dx": 100, "dy": 20}}, "open"],
+    [30, {}]
+  ],
+  "osc": [
+    {"p": "rx", "amp": 14, "hz": 2, "from": 8, "to": 32, "shape": "pulse"},
+    {"p": "ry", "amp": -4, "hz": 2, "from": 8, "to": 32, "shape": "pulse"}
+  ]
+}

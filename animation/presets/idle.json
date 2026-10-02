@@ -1,0 +1,8 @@
+{
+  "name": "idle",
+  "about": "Standing still. Breathing and blinking run on every character all the time; this just holds the rest pose.",
+  "length": 24,
+  "keys": [
+    [0, {}]
+  ]
+}

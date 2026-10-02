@@ -1,0 +1,13 @@
+{
+  "_about": "Characters with no vault article or portrait spec yet. PLACEHOLDER LOOKS made up by Claude for test scenes; replace by giving them a portrait: block in the vault.",
+  "Cantij": { "note": "signs for Susia in the treaty test; role unconfirmed",
+    "spec": { "eyes":"dot","eyeliner":"none","brows":"arched","nose":"hook","mouth":"smile","hair":"cap","facial":[],"eyewear":"none","outfit":"suit","extras":["forehead"],
+      "shape":{"headW":0.97,"headH":1.0,"bodyW":1.02,"bodyH":1.04},"palette":{"hair":"#3b2a20","facial":"#3b2a20","suit":"#141414","shirt":"#ebebeb","tie":"#9c1c22"} } },
+  "Aide (glasses)": { "spec": { "eyes":"dot","brows":"stern","nose":"bulb","mouth":"line","hair":"sides","eyewear":"square","outfit":"suit","extras":["forehead"],
+      "shape":{"headW":1.0,"headH":0.95,"bodyW":1.05,"bodyH":0.98},"palette":{"hair":"#2e2620","facial":"#2e2620","frames":"#5b4900","suit":"#3b3b3e","shirt":"#f2f2f2","tie":"#101830"} } },
+  "Aide (tall)": { "spec": { "eyes":"dot","brows":"wavy","nose":"long","mouth":"short","hair":"swept","outfit":"suit",
+      "shape":{"headW":0.93,"headH":1.02,"bodyW":0.95,"bodyH":1.1},"palette":{"hair":"#6d6258","facial":"#6d6258","suit":"#161b2e","shirt":"#f4f4f4","tie":"#4a4d55"} } },
+  "Kolkov": { "note": "assembled for the 2009 interview test; no spec in his article yet",
+    "spec": { "eyes":"dot","nose":"bulb","mouth":"short","eyewear":"browline","outfit":"suit-open","hair":"sides","brows":"bushy","extras":["forehead","eye-bags","cheek-lines"],
+      "shape":{"headW":1.04,"headH":0.97,"bodyW":1.12,"bodyH":0.95},"palette":{"hair":"#c3c3c3","facial":"#c3c3c3","frames":"#41230a","suit":"#333333","shirt":"#ebebeb"} } }
+}

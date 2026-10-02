@@ -1,0 +1,14 @@
+{
+  "name": "dripsite-animation",
+  "private": true,
+  "type": "module",
+  "description": "Animates the site's bowling-pin portraits. Separate from the site build so the site never installs the renderer.",
+  "scripts": {
+    "draft": "node --import ./lib/register.mjs lib/render.mjs --draft",
+    "render": "node --import ./lib/register.mjs lib/render.mjs",
+    "cast": "node --import ./lib/register.mjs lib/cast.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}
