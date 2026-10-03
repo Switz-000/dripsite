@@ -32,7 +32,7 @@
   --font-mono:    'JetBrains Mono', 'Courier New', monospace;
 
   --sidebar-w:    240px;
-  --content-max:  1000px;
+  --content-max:  1500px;
   --transition:   120ms ease;
 }
 
@@ -1425,8 +1425,6 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 tr:has(.people-entry) > td { vertical-align: middle; }
 tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
 
-/* Pages with portrait lists get more room: wider column, smaller margins */
-.page-inner:has(.people-entry) { max-width: 1500px; padding: 24px 20px 60px; }
 .article-body td:has(.people-entry) { padding-top: 8px; padding-bottom: 8px; }
 
 /* Same column widths in every portrait table on a page */
