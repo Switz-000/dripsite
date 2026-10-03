@@ -10,6 +10,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import MapPage from './pages/MapPage'
 import LandingPage from './pages/LandingPage'
 import PortraitsPage from './pages/PortraitsPage'
+import SketchPage from './pages/SketchPage'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="chronology/spans" element={<ChronologyPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="dev/portraits" element={<PortraitsPage />} />
+        <Route path="dev/sketch" element={<SketchPage />} />
         <Route path="*" element={<NotFoundPage />} />
         <Route path="map" element={<MapPage />} />
       </Route>
