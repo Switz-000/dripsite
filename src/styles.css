@@ -1406,6 +1406,45 @@ a.chrono-span.at-inside:hover .chrono-who { color: var(--bg); }
 .dp-status { font-size: 0.72rem; color: var(--text-muted); }
 .dp-paste { width: 100%; font-family: var(--font-mono); font-size: 0.7rem; padding: 8px; border: 1px solid var(--border); background: var(--bg); resize: vertical; }
 
+/* Lists that name people: big portrait with the name below it */
+.people-entry { display: inline-flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; }
+.people-entry-text { min-width: 0; font-weight: 600; }
+.people-item { list-style: none; margin-left: -1.2rem; display: inline-block; vertical-align: top; margin-right: 1.2rem; }
+.people-portrait {
+  flex: none;
+  width: 13rem;
+  max-width: 100%;
+  aspect-ratio: 4 / 4.4;
+  background: var(--bg-surface);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 3px;
+  overflow: hidden;
+}
+.people-portrait svg { display: block; width: 100%; height: 100%; }
+.people-portrait-empty { opacity: 0.5; }
+tr:has(.people-entry) > td { vertical-align: middle; }
+tr:has(.people-entry) > td:has(.people-entry) { text-align: center; }
+
+/* Pages with portrait lists get more room: wider column, smaller margins */
+.page-inner:has(.people-entry) { max-width: 1500px; padding: 24px 20px 60px; }
+.article-body td:has(.people-entry) { padding-top: 8px; padding-bottom: 8px; }
+
+/* Same column widths in every portrait table on a page */
+.article-body table:has(.people-entry) { width: 100%; }
+.article-body td:has(.people-entry) { width: 15rem; min-width: 15rem; }
+.article-body td:first-child:not(:has(.people-entry)) { width: 3.5rem; }
+
+/* Person hover card: their drawn portrait at the top */
+.wiki-popup-portrait { background: var(--bg-surface); border-bottom: 1px solid var(--border); }
+.wiki-popup-portrait svg { height: 200px; width: auto; margin: 0 auto; }
+
+.ibx-qstat-sub::first-letter { text-transform: uppercase; }
+.dp-search { width: 100%; max-width: 260px; font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-primary); }
+.dp-peoplelist { list-style: none; margin: 6px 0 0; padding: 0; max-height: 280px; overflow-y: auto; border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.dp-person { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 8px; border: 0; background: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-align: left; }
+.dp-person:hover { background: var(--bg); }
+.dp-face { width: 36px; height: 36px; flex: none; overflow: hidden; border: 1px solid var(--border); background: var(--bg-surface); }
+
 /* ── Part sketchpad ───────────────────────────────────────────── */
 .sk .dp-lede { margin-bottom: 12px; }
 .sk kbd { font-family: var(--font-mono); font-size: 0.6rem; opacity: 0.55; margin-left: 3px; }
