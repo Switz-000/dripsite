@@ -1,14 +1,15 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useArticle, useFileTree, useFlags } from '../hooks/useVault'
+import { useArticle, useFileTree, useFlags, usePeople } from '../hooks/useVault'
 import { getTypeLabel } from '../utils/markdown'
 import { wikilinkToSlug, pathToSlug } from '../utils/github'
 import { infoboxImageOf, countryFlagOf } from '../utils/articleImage'
+import { decoratePeople } from '../utils/peopleLists'
 import { SITE } from '../config'
 import Infobox from '../components/Infobox'
 import PersonInfobox from '../components/PersonInfobox'
 import { Loading, ErrorState } from '../components/Loading'
-import { fetchPreview } from '../utils/previews'
+import { useLinkPreview } from '../hooks/useLinkPreview'
 import WikiPopup from '../components/WikiPopup'
 
 export default function ArticlePage() {
@@ -18,60 +19,12 @@ export default function ArticlePage() {
   const { article, loading, error } = useArticle(slug)
   const { tree } = useFileTree()
   const flags = useFlags()
+  const people = usePeople(article?.html, tree)
   const navigate = useNavigate()
   const location = useLocation()
 
   const bodyRef = useRef(null)
-  const [popup, setPopup] = useState({ visible: false, x: 0, y: 0, data: null, slug: null })
-  const hoverTimerRef = useRef(null)
-  const hideTimerRef = useRef(null)
-  const fetchTokenRef = useRef(0)
-
-  const cancelHide = () => clearTimeout(hideTimerRef.current)
-  const scheduleHide = () => {
-    hideTimerRef.current = setTimeout(() => {
-      setPopup(p => ({ ...p, visible: false }))
-    }, 120)
-  }
-
-  useEffect(() => {
-    const el = bodyRef.current
-    if (!el || !tree) return
-
-    function onOver(e) {
-      const link = e.target.closest('a.wikilink, a.ibx-link')
-      if (!link) return
-      const linkSlug = link.getAttribute('href')?.replace('/article/', '')
-      if (!linkSlug) return
-      cancelHide()
-      clearTimeout(hoverTimerRef.current)
-      const mx = e.clientX, my = e.clientY
-      const token = ++fetchTokenRef.current
-      hoverTimerRef.current = setTimeout(async () => {
-        const data = await fetchPreview(linkSlug, tree)
-        if (fetchTokenRef.current !== token) return
-        if (data) setPopup({ visible: true, x: mx, y: my, data, slug: linkSlug })
-      }, 350)
-    }
-
-    function onOut(e) {
-      const link = e.target.closest('a.wikilink, a.ibx-link')
-      if (!link) return
-      if (link.contains(e.relatedTarget)) return
-      clearTimeout(hoverTimerRef.current)
-      fetchTokenRef.current++
-      scheduleHide()
-    }
-
-    el.addEventListener('mouseover', onOver)
-    el.addEventListener('mouseout', onOut)
-    return () => {
-      el.removeEventListener('mouseover', onOver)
-      el.removeEventListener('mouseout', onOut)
-      clearTimeout(hoverTimerRef.current)
-      clearTimeout(hideTimerRef.current)
-    }
-  }, [tree, article])
+  const popup = useLinkPreview(bodyRef, tree, { rebind: [article] })
 
   useEffect(() => {
     if (article) {
@@ -84,7 +37,10 @@ export default function ArticlePage() {
   // found, swap the address bar to its canonical slug so every article has
   // exactly one URL. `replace` keeps the old URL out of the back button.
   useEffect(() => {
-    if (!article) return
+    // article.slug is the slug it was loaded for. After back/forward the URL
+    // changes a render before the article does; redirecting on that stale
+    // article bounces between the two pages forever.
+    if (!article || article.slug !== slug) return
     const canonical = pathToSlug(article.path)
     if (slug !== canonical) {
       navigate(`/article/${canonical}${location.hash}`, { replace: true })
@@ -151,20 +107,12 @@ export default function ArticlePage() {
           ? <PersonInfobox meta={article.meta} title={article.title} imageUrl={infoboxImage} wikilinkFn={wikilinkFn} />
           : <Infobox meta={article.meta} title={article.title} imageUrl={infoboxImage} flagUrl={flagUrl} wikilinkFn={wikilinkFn} />
         }
-        <div dangerouslySetInnerHTML={{ __html: article.html }} />
+        <div dangerouslySetInnerHTML={{ __html: decoratePeople(article.html, people) }} />
       </div>
     </div>
 
-    <WikiPopup
-      data={popup.data}
-      slug={popup.slug}
-      x={popup.x}
-      y={popup.y}
-      visible={popup.visible}
-      onMouseEnter={cancelHide}
-      onMouseLeave={scheduleHide}
-      onClose={() => setPopup(p => ({ ...p, visible: false }))}
-    />
+    <WikiPopup data={popup.data} slug={popup.slug} x={popup.x} y={popup.y} visible={popup.visible}
+      onMouseEnter={popup.onMouseEnter} onMouseLeave={popup.onMouseLeave} onClose={popup.onClose} />
   </>
   )
 }

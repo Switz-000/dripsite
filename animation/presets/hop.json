@@ -1,0 +1,15 @@
+{
+  "name": "hop",
+  "about": "Crouch, jump with arms up, squash on landing and wobble back. Joy, or surprise.",
+  "length": 58,
+  "keys": [
+    [0, {"bw": 1.09, "bh": 0.9, "legs": 0.93, "lx": 6, "ly": 22, "rx": -6, "ry": 22, "hy": 4, "brow": 2}, "short"],
+    [12, {"bw": 0.93, "bh": 1.09, "legs": 1.04, "brow": -8, "handL": {"to": "headL", "dx": -35, "dy": -45}, "handR": {"to": "headR", "dx": 35, "dy": -45}}, "open"],
+    [30, {}, "smile"]
+  ],
+  "snap": [
+    [12, {"bw": 0.92, "bh": 1.1, "legs": 1.05}],
+    [30, {"bw": 1.13, "bh": 0.86, "legs": 0.86, "hy": 8}, {"ly": 12, "ry": 12}]
+  ],
+  "arc": {"from": 12, "len": 18, "height": 50}
+}

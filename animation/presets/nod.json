@@ -1,0 +1,12 @@
+{
+  "name": "nod",
+  "about": "Two small nods. Agreeing, or listening.",
+  "length": 26,
+  "keys": [
+    [0, {"brow": -2}]
+  ],
+  "osc": [
+    {"p": "hy", "amp": 6, "hz": 2.2, "from": 0, "to": 20, "shape": "pulse"},
+    {"p": "tilt", "amp": 1.5, "hz": 2.2, "from": 0, "to": 20, "shape": "pulse"}
+  ]
+}

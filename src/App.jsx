@@ -26,6 +26,7 @@ export default function App() {
         <Route path="article/*" element={<ArticlePage />} />
         <Route path="browse" element={<BrowsePage />} />
         <Route path="chronology" element={<ChronologyPage />} />
+        <Route path="chronology/spans" element={<ChronologyPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="dev/portraits" element={<PortraitsPage />} />
         <Route path="dev/sketch" element={<SketchPage />} />

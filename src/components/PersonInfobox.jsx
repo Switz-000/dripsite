@@ -116,22 +116,30 @@ function normalizeMeta(raw) {
       typeof c === 'string' ? { charge: c } : c
     )
   }
-  // offices: new schema renamed start_year/end_year (was start/end) and
-  // parties[] (was party). Map to a single internal shape so the rest of the
-  // component reads start/end/_parties regardless of source format. _parties is
-  // kept as the raw array (may contain [[wikilinks]]) so each consumer can decide
-  // to render it as links (offices list) or as plain text (lifeline).
-  if (Array.isArray(rec.offices)) {
-    rec.offices = rec.offices.map(o => {
-      if (!o || typeof o !== 'object') return o
-      const partyList = Array.isArray(o.parties)
-        ? o.parties.filter(Boolean)
-        : (o.party ? [o.party] : [])
+  // titles: formal offices/seats (elected or appointed). Map to a single
+  // internal shape so the rest of the component reads start/end/_parties
+  // regardless of source format. _parties is kept as the raw array (may
+  // contain [[wikilinks]]) so each consumer can decide to render it as links
+  // (titles list) or as plain text (lifeline).
+  if (Array.isArray(rec.titles)) {
+    rec.titles = rec.titles.map(t => {
+      if (!t || typeof t !== 'object') return t
       return {
-        ...o,
-        start: o.start_year ?? o.start ?? null,
-        end: o.end_year ?? o.end ?? null,
-        _parties: partyList,
+        ...t,
+        start: t.start_year ?? null,
+        end: t.end_year ?? null,
+        _parties: Array.isArray(t.parties) ? t.parties.filter(Boolean) : [],
+      }
+    })
+  }
+  // roles: jobs held, distinct from titles — never build a "holder list".
+  if (Array.isArray(rec.roles)) {
+    rec.roles = rec.roles.map(r => {
+      if (!r || typeof r !== 'object') return r
+      return {
+        ...r,
+        start: r.start_year ?? null,
+        end: r.end_year ?? null,
       }
     })
   }
@@ -157,8 +165,15 @@ function highestOffice(offices) {
   return [...offices].sort((a, b) => officeRank(b) - officeRank(a))[0]
 }
 
+// The article a title's [[wikilink]] points to, for the quick-stats link
+function officeLink(o) {
+  const m = /\[\[([^\]|#]+)/.exec(o?.title || '')
+  return m ? m[1].trim() : null
+}
+
 function shortOffice(o) {
   return (o.title || '')
+    .replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2')
     .replace(/^Presiding /, 'Pres. ')
     .replace(/^President /, 'Pres. ')
     .replace(/^Member of the General Government of the .*/, 'Gen. Gov.')
@@ -183,13 +198,14 @@ function buildQuickStats(rec) {
   if (rec.birth?.year && rec.death?.year) {
     out.push({ label: 'Age at death', value: rec.death.year - rec.birth.year, unit: 'yrs' })
   }
-  const offices = compact(rec.offices)
-  if (offices.length) {
-    const o = highestOffice(offices)
+  const titles = compact(rec.titles)
+  if (titles.length) {
+    const o = highestOffice(titles)
     if (o) out.push({
-      label: offices.length > 1 ? 'Highest office' : 'Office',
+      label: titles.length > 1 ? 'Highest office' : 'Office',
       value: `${o.start ?? '?'}–${String(o.end ?? '').slice(-2) || '?'}`,
       sub: shortOffice(o),
+      subLink: officeLink(o),
     })
   }
   const awards = compact(rec.awards)
@@ -231,7 +247,7 @@ function buildTabs(rec) {
       .some(k => has(rec[k]))) {
     tabs.push({ id: 'facts', label: 'Facts' })
   }
-  if (['occupation','education','offices','party','parties','organization','organizations','political_alignment','military_service']
+  if (['occupation','education','titles','roles','party','parties','organization','organizations','political_alignment','military_service']
       .some(k => has(rec[k]))) {
     tabs.push({ id: 'career', label: 'Career' })
   }
@@ -271,7 +287,7 @@ function PortraitSection({ rec, name, imageUrl, portrait }) {
 }
 
 // ── Quick stats strip ───────────────────────────────────────────────
-function QuickStatsRow({ stats }) {
+function QuickStatsRow({ stats, wikilinkFn }) {
   return (
     <div className="ibx-qstats" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
       {stats.map((s, i) => (
@@ -281,7 +297,12 @@ function QuickStatsRow({ stats }) {
             {s.value}
             {s.unit && <span className="ibx-qstat-unit">{s.unit}</span>}
           </div>
-          {s.sub && <div className="ibx-qstat-sub">{s.sub}</div>}
+          {s.sub && (() => {
+            const slug = s.subLink && wikilinkFn ? wikilinkFn(s.subLink) : null
+            return <div className="ibx-qstat-sub">
+              {slug ? <Link to={`/article/${slug}`} className="ibx-link">{s.sub}</Link> : s.sub}
+            </div>
+          })()}
         </div>
       ))}
     </div>
@@ -388,7 +409,8 @@ function Lifeline({ events }) {
 function CareerPanel({ rec, wikilinkFn }) {
   const occ = compact(rec.occupation)
   const edu = compact(rec.education)
-  const offices = compact(rec.offices)
+  const titles = compact(rec.titles)
+  const roles = compact(rec.roles)
   const align = rec.political_alignment
   const parties = [...(Array.isArray(rec.parties) ? rec.parties : []),
     ...(rec.party ? [rec.party] : [])]
@@ -414,17 +436,26 @@ function CareerPanel({ rec, wikilinkFn }) {
         location: e.institution ? stripWL(String(e.institution)) : null,
       })
     })
-    offices.forEach(o => {
-      if (o.start) ev.push({
-        year: o.start, kind: 'office',
-        title: o.title || 'Office',
-        span: o.end ? `${o.start}–${o.end}` : `${o.start}–?`,
-        location: o.employer ? stripWL(String(o.employer)) : null,
+    titles.forEach(t => {
+      if (t.start) ev.push({
+        year: t.start, kind: 'office',
+        title: t.title ? stripWL(String(t.title)) : 'Title',
+        span: t.end ? `${t.start}–${t.end}` : `${t.start}–?`,
+        location: t.seat ? stripWL(String(t.seat)) : null,
         party: [
-          o._parties?.length ? o._parties.map(p => stripWL(String(p))).join(', ') : null,
-          o.appointer ? `appt. ${stripWL(String(o.appointer))}` : null,
+          t._parties?.length ? t._parties.map(p => stripWL(String(p))).join(', ') : null,
+          t.appointer ? `appt. ${stripWL(String(t.appointer))}` : null,
         ].filter(Boolean).join(' · ') || null,
-        notes: o.notes || null,
+        notes: t.notes || null,
+      })
+    })
+    roles.forEach(r => {
+      if (r.start) ev.push({
+        year: r.start, kind: 'event',
+        title: r.role || 'Role',
+        span: r.end ? `${r.start}–${r.end}` : `${r.start}–?`,
+        location: r.employer ? stripWL(String(r.employer)) : null,
+        notes: r.notes || null,
       })
     })
     military.forEach(m => {
@@ -488,20 +519,37 @@ function CareerPanel({ rec, wikilinkFn }) {
         </div>
       )}
 
-      {offices.length > 0 && (
+      {titles.length > 0 && (
         <div className="ibx-section">
           <div className="ibx-section-label">Offices held</div>
-          {offices.map((o, i) => (
+          {titles.map((t, i) => (
             <div key={i} className="ibx-office-item">
-              <div className="ibx-office-title">{o.title}</div>
-              {o.employer && (
-                <div className="ibx-meta"><Field value={o.employer} wikilinkFn={wikilinkFn} /></div>
+              <div className="ibx-office-title"><Field value={t.title} wikilinkFn={wikilinkFn} /></div>
+              {t.seat && (
+                <div className="ibx-meta"><Field value={t.seat} wikilinkFn={wikilinkFn} /></div>
               )}
               <div className="ibx-meta">
-                {o.start ?? '?'}–{o.end ?? '?'}
-                {o._parties?.length > 0 && <> · <Field value={o._parties} wikilinkFn={wikilinkFn} /></>}
+                {t.start ?? '?'}–{t.end ?? '?'}
+                {t._parties?.length > 0 && <> · <Field value={t._parties} wikilinkFn={wikilinkFn} /></>}
+                {t.appointer && <> · appt. <Field value={t.appointer} wikilinkFn={wikilinkFn} /></>}
               </div>
-              {o.notes && <div className="ibx-notes">{o.notes}</div>}
+              {t.notes && <div className="ibx-notes">{t.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {roles.length > 0 && (
+        <div className="ibx-section">
+          <div className="ibx-section-label">Roles</div>
+          {roles.map((r, i) => (
+            <div key={i} className="ibx-office-item">
+              <div className="ibx-office-title">{r.role}</div>
+              {r.employer && (
+                <div className="ibx-meta"><Field value={r.employer} wikilinkFn={wikilinkFn} /></div>
+              )}
+              <div className="ibx-meta">{r.start ?? '?'}–{r.end ?? '?'}</div>
+              {r.notes && <div className="ibx-notes">{r.notes}</div>}
             </div>
           ))}
         </div>
@@ -698,7 +746,7 @@ export default function PersonInfobox({ meta, title, imageUrl, wikilinkFn }) {
     <aside className="ibx-person">
       <PortraitSection rec={rec} name={name} imageUrl={imageUrl} portrait={meta?.portrait} />
 
-      {stats.length > 0 && <QuickStatsRow stats={stats} />}
+      {stats.length > 0 && <QuickStatsRow stats={stats} wikilinkFn={wikilinkFn} />}
 
       {tabs.length > 0 && <TabBar tabs={tabs} active={tab} onSelect={setTab} />}
 

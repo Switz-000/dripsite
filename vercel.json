@@ -6,6 +6,7 @@
     { "source": "/browse", "destination": "/browse/index.html" },
     { "source": "/map", "destination": "/map/index.html" },
     { "source": "/chronology", "destination": "/chronology/index.html" },
+    { "source": "/chronology/spans", "destination": "/chronology/spans/index.html" },
     { "source": "/search", "destination": "/spa.html" },
     { "source": "/dev/portraits", "destination": "/spa.html" },
     { "source": "/dev/sketch", "destination": "/spa.html" }

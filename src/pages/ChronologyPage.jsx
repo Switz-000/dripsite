@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useChronology, useFileTree } from '../hooks/useVault'
+import { useLinkPreview } from '../hooks/useLinkPreview'
+import WikiPopup from '../components/WikiPopup'
 import { wikilinkToSlug } from '../utils/github'
 import { Loading } from '../components/Loading'
 
@@ -9,6 +11,7 @@ const GROUP_OF = {
   Birth: 'people', Death: 'people', Appointment: 'people', 'End of tenure': 'people',
   Graduation: 'people', Enlists: 'people', Discharge: 'people', Award: 'people',
   Charged: 'people', Verdict: 'people',
+  'Change of office': 'people', 'Leaves office and dies': 'people',
   Founded: 'institutions', Dissolved: 'institutions',
   'Yarnojte granted': 'institutions', 'Yarnojte revoked': 'institutions',
   Publication: 'documents', 'Document recorded': 'documents',
@@ -54,22 +57,24 @@ function labelWidth(s, font) {
   return w
 }
 
-// [[Target|Label]] and *italics* as React nodes
-function text(raw, tree) {
+// [[Target|Label]] and *italics* as React nodes. Links are read inside
+// italics too, since books and notes are written as *...[[Link]]...*.
+function text(raw, tree, keyBase = '') {
   const out = []
   let last = 0
   const re = /\[\[([^\]]+)\]\]|\*([^*]+)\*/g
   let m
   while ((m = re.exec(raw)) !== null) {
     if (m.index > last) out.push(raw.slice(last, m.index))
+    const key = keyBase + out.length
     if (m[1] !== undefined) {
       const [target, label] = m[1].split('|')
       const slug = tree ? wikilinkToSlug(target, tree) : null
       out.push(slug
-        ? <Link key={out.length} to={`/article/${slug}`}>{(label || target).trim()}</Link>
-        : <span key={out.length} className="chrono-missing">{(label || target).trim()}</span>)
+        ? <Link key={key} to={`/article/${slug}`}>{(label || target).trim()}</Link>
+        : <span key={key} className="chrono-missing">{(label || target).trim()}</span>)
     } else {
-      out.push(<em key={out.length}>{m[2]}</em>)
+      out.push(<em key={key}>{text(m[2], tree, key + '.')}</em>)
     }
     last = re.lastIndex
   }
@@ -77,15 +82,85 @@ function text(raw, tree) {
   return out
 }
 
+// Who an event is about: the article it came from, or, for the election
+// blocks that have none, the person named first in the line.
+function personOf(e) {
+  if (e.source_type !== 'person') return null
+  return e.source || (e.text.match(/^\[\[([^\]|]+)/) || [])[1] || null
+}
+
+// Folds events that describe one moment into a single line:
+//  - leaving an office and dying in the same year
+//  - leaving an office and taking another in the same year
+//  - something that begins and ends in the same year
+function mergeEvents(events) {
+  const drop = new Set()
+  const add = []
+
+  const people = new Map()
+  events.forEach((e, i) => {
+    const who = personOf(e)
+    if (!who) return
+    const k = e.year + '\u0000' + who
+    if (!people.has(k)) people.set(k, [])
+    people.get(k).push(i)
+  })
+  for (const idx of people.values()) {
+    const ends = idx.filter(i => events[i].kind === 'End of tenure')
+    if (!ends.length) continue
+    const appts = idx.filter(i => events[i].kind === 'Appointment')
+    const death = idx.find(i => events[i].kind === 'Death')
+    const left = ends.slice()
+    appts.forEach(a => {
+      const end = left.shift()
+      if (end === undefined) return
+      const rest = events[a].text.replace(/^\[\[[^\]]+\]\],? ?(becomes )?/, '')
+      drop.add(end); drop.add(a)
+      add.push({ ...events[a], kind: 'Change of office',
+                 text: `${events[end].text} and becomes ${rest}` })
+    })
+    if (death !== undefined && left.length) {
+      const d = events[death]
+      const leaves = left.map(i => events[i].text.replace(/^\[\[[^\]]+\]\] leaves /, ''))
+      left.forEach(i => drop.add(i)); drop.add(death)
+      add.push({ ...d, kind: 'Leaves office and dies',
+                 text: d.text.replace(/^(\[\[[^\]]+\]\]) died/,
+                   `$1 leaves ${leaves.join(' and ')} and dies`) })
+    }
+  }
+
+  const spans = new Map()
+  events.forEach((e, i) => {
+    const m = e.kind.match(/^(.+) (begins|ends)$/)
+    if (!m) return
+    const k = [e.year, m[1], e.source || e.text.split(' *')[0]].join('\u0000')
+    if (!spans.has(k)) spans.set(k, { begins: null, ends: null })
+    spans.get(k)[m[2]] = i
+  })
+  for (const { begins, ends } of spans.values()) {
+    if (begins === null || ends === null) continue
+    drop.add(begins); drop.add(ends)
+    add.push({ ...events[begins], kind: events[begins].kind.replace(/ begins$/, '') })
+  }
+
+  if (!drop.size) return events
+  return [...events.filter((_, i) => !drop.has(i)), ...add].sort((a, b) => a.year - b.year)
+}
+
 export default function ChronologyPage() {
   const data = useChronology()
   const { tree } = useFileTree()
-  const [view, setView] = useState('timeline')
+  // The view lives in the URL (/chronology or /chronology/spans), so a reload stays put
+  const navigate = useNavigate()
+  const view = useLocation().pathname.replace(/\/+$/, '').endsWith('/spans') ? 'spans' : 'timeline'
+  const setView = v => navigate(v === 'spans' ? '/chronology/spans' : '/chronology', { replace: true })
+  const pageRef = useRef(null)
+  const popup = useLinkPreview(pageRef, tree, { selector: 'a[href^="/article/"]', rebind: [data] })
   const [groups, setGroups] = useState(() => new Set(GROUPS.map(g => g[0])))
   const [country, setCountry] = useState('all')
   const [from, setFrom] = useState('1900')
 
-  const events = data?.events || []
+  const events = useMemo(() => mergeEvents(data?.events || []), [data])
   const spans = data?.spans || []
 
   const countries = useMemo(
@@ -119,7 +194,8 @@ export default function ChronologyPage() {
   }
 
   return (
-    <div className="page-inner chrono">
+    <>
+    <div className="page-inner chrono" ref={pageRef}>
       <div className="article-type-badge">Index</div>
       <h1 className="article-title">Chronology</h1>
       <p className="chrono-lede">
@@ -162,6 +238,9 @@ export default function ChronologyPage() {
         ? <Timeline events={shown} tree={tree} showCountry={country === 'all'} />
         : <Spans spans={spans} groups={groups} country={country} from={from} max={max} tree={tree} />}
     </div>
+    <WikiPopup data={popup.data} slug={popup.slug} x={popup.x} y={popup.y} visible={popup.visible}
+      onMouseEnter={popup.onMouseEnter} onMouseLeave={popup.onMouseLeave} onClose={popup.onClose} />
+    </>
   )
 }
 
@@ -287,7 +366,9 @@ function layoutRow(items, geom, pct, lo, max, folded) {
   // What each bar takes up on its line: the bar itself, plus the name when
   // the name is what keeps the next bar away — which is never so folded.
   const from = it => (it.place === 'left' && !folded ? it.left - LABEL_GAP - it.nameW : it.left)
-  const to = it => (folded ? it.right
+  // Folded, a bar ends where its years end: a one-year term is drawn a hair
+  // wide, but a term starting that same year still fits on the line after it.
+  const to = it => (folded ? (it.b / 100) * px
     : it.place === 'right' ? it.right + LABEL_GAP + it.nameW
     : it.place === 'over' ? Math.max(it.right, it.left + it.offset + it.nameW)
     : it.right)
@@ -441,16 +522,18 @@ function Spans({ spans, groups, country, from, max, tree }) {
         const ls = rows.filter(s => s.lane === lane).sort((x, y) => (x.start ?? 0) - (y.start ?? 0))
         if (!ls.length) return null
         // Titles get one row per title, holders side by side; overlapping
-        // holders, and interludes, stack underneath.
+        // holders, and interludes, stack underneath. A row is the canonical
+        // title, so a renamed office (a period of the title) stays on one
+        // line; the name in force at the time shows on each bar's tooltip.
         const keys = lane === 'titles'
-          ? [...new Set(ls.map(s => s.display || s.title || s.label))]
+          ? [...new Set(ls.map(s => s.title || s.display || s.label))]
           : ls.map(s => s.label)
         return (
           <div className="chrono-lane" key={lane}>
             <h2>{laneLabel}</h2>
             {keys.map(k => {
               const items = lane === 'titles'
-                ? ls.filter(s => (s.display || s.title || s.label) === k)
+                ? ls.filter(s => (s.title || s.display || s.label) === k)
                 : ls.filter(s => s.label === k)
               // The row's own article: the title as it is written here, or
               // the canonical title the vault filed these tenures under.
@@ -495,7 +578,7 @@ function Spans({ spans, groups, country, from, max, tree }) {
                   </div>
                   <div className="chrono-track">
                     {grid}
-                    {row.map((it, j) => bar(it, k, colorOf(it.span), j))}
+                    {row.map((it, j) => bar(it, it.span.display || k, colorOf(it.span), j))}
                   </div>
                 </div>
               ))

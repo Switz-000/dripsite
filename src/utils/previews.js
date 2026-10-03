@@ -13,6 +13,11 @@ function countryFlag(type, path, flagMap) {
   return flagUrlFor(base, flagMap)
 }
 
+// A person's drawn portrait (frontmatter `portrait:`), shown instead of an image
+function portraitOf(meta) {
+  return meta?.type === 'person' && meta.portrait && typeof meta.portrait === 'object' ? meta.portrait : null
+}
+
 export async function fetchPreview(slug, tree) {
   if (previewCache.has(slug)) return previewCache.get(slug)
 
@@ -29,6 +34,7 @@ export async function fetchPreview(slug, tree) {
       summary: cached.meta?.summary || cached.summary || '',
       imageUrl: flag || (imgMatch ? imgMatch[1] : null),
       imageIsFlag: !!flag,
+      portrait: portraitOf(cached.meta),
     }
     previewCache.set(slug, result)
     return result
@@ -49,6 +55,7 @@ export async function fetchPreview(slug, tree) {
       summary: meta.summary || extractSummary(body),
       imageUrl: flag || (imgMatch ? imageUrl(imgMatch[1]) : null),
       imageIsFlag: !!flag,
+      portrait: portraitOf(meta),
     }
     previewCache.set(slug, result)
     return result
