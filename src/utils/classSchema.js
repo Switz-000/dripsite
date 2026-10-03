@@ -1,15 +1,13 @@
-import { REPO_CONFIG, fetchMarkdown } from './github.js'
+import { vault } from '../vault/index.js'
 
 // ── Class file list ────────────────────────────────────────────
-async function fetchClassFileList() {
-  const base = `https://api.github.com/repos/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}`
-  const headers = { Accept: 'application/vnd.github.v3+json' }
-  if (REPO_CONFIG.token) headers['Authorization'] = `Bearer ${REPO_CONFIG.token}`
+// The Metadata Menu class files, one per article type, from the listing
+// the vault already has
+const CLASS_DIR = '00 - Meta/Class/'
 
-  const res = await fetch(`${base}/contents/00%20-%20Meta%2FClass`, { headers })
-  if (!res.ok) return []
-  const files = await res.json()
-  return Array.isArray(files) ? files.filter(f => f.name.endsWith('.md') && f.type === 'file') : []
+async function classFiles() {
+  const files = await vault.files().catch(() => [])
+  return files.filter(p => p.startsWith(CLASS_DIR) && !p.slice(CLASS_DIR.length).includes('/') && p.endsWith('.md'))
 }
 
 // ── Parser ─────────────────────────────────────────────────────
@@ -126,15 +124,14 @@ export async function fetchClassSchemas() {
   if (_pending) return _pending
 
   _pending = (async () => {
-    const files = await fetchClassFileList()
+    const files = await classFiles()
     const schemas = {}
 
     await Promise.all(
-      files.map(async f => {
-        const typeName = f.name.replace(/\.md$/, '').toLowerCase()
+      files.map(async path => {
+        const typeName = path.slice(CLASS_DIR.length).replace(/\.md$/, '').toLowerCase()
         try {
-          const text = await fetchMarkdown(`00 - Meta/Class/${f.name}`)
-          const allFields = parseClassFile(text)
+          const allFields = parseClassFile(await vault.text(path))
           schemas[typeName] = buildFilterSchema(allFields)
         } catch {
           schemas[typeName] = []

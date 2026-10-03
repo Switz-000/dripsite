@@ -1,8 +1,7 @@
-// Reads and writes `portrait:` blocks in the dripwiki vault's person articles.
-// Reading uses raw.githubusercontent (no API rate limit); writing commits
-// through the GitHub contents API and needs a token with write access.
-import { REPO_CONFIG, getFileTree, fetchMarkdown } from '../utils/github'
-import { parseFrontmatter } from '../utils/markdown'
+// Writes `portrait:` blocks into the dripwiki vault's person articles: a
+// commit through the GitHub contents API, which needs a token with write
+// access. Reading people and their portraits is the vault's job (src/vault).
+import { REPO_CONFIG } from '../utils/github'
 import { toYaml } from './engine'
 
 const API = `https://api.github.com/repos/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/contents/`
@@ -13,36 +12,6 @@ export function getToken() {
 }
 export function setToken(t) {
   try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY) } catch { /* private mode */ }
-}
-
-let cache = null
-// Every person article in the vault: [{ path, name, portrait|null }]. Reads each
-// article's frontmatter, a few at a time; onProgress(done, total) reports along the way.
-export async function listPeople(onProgress, force = false) {
-  if (cache && !force) return cache
-  const tree = await getFileTree()
-  const out = []
-  let next = 0, done = 0
-  async function worker() {
-    while (next < tree.length) {
-      const f = tree[next++]
-      try {
-        const raw = await fetchMarkdown(f.path)
-        const { meta } = parseFrontmatter(raw)
-        if (meta?.type === 'person') {
-          out.push({
-            path: f.path,
-            name: f.path.split('/').pop().replace(/\.md$/, ''),
-            portrait: meta.portrait && typeof meta.portrait === 'object' ? meta.portrait : null,
-          })
-        }
-      } catch { /* unreadable file: skip it */ }
-      onProgress?.(++done, tree.length)
-    }
-  }
-  await Promise.all(Array.from({ length: 8 }, worker))
-  out.sort((a, b) => a.name.localeCompare(b.name))
-  return (cache = out)
 }
 
 // Returns the article text with its frontmatter `portrait:` block replaced by
@@ -84,8 +53,4 @@ export async function exportPortrait(path, spec) {
     body: JSON.stringify({ message: `Update portrait: ${name}`, content: b64encode(updated), sha: file.sha, branch: REPO_CONFIG.branch }),
   })
   if (!res.ok) throw new Error(res.status === 404 || res.status === 403 ? `GitHub refused the write (${res.status}). Check the token can write to ${REPO_CONFIG.owner}/${REPO_CONFIG.repo}.` : `Commit failed (${res.status}).`)
-  if (cache) {
-    const p = cache.find(x => x.path === path)
-    if (p) p.portrait = JSON.parse(JSON.stringify(spec))
-  }
 }

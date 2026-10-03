@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Portrait from '../portrait/Portrait'
 import { DEFAULT_SPEC, SLOT_OPTIONS, SLOT_ORDER, MULTI, STACHE, SHAPES, COLORS, SWATCHES, normalizeSpec, toYaml } from '../portrait/engine'
 import { parseFrontmatter } from '../utils/markdown'
-import { listPeople, exportPortrait, getToken, setToken } from '../portrait/vaultPortraits'
+import { exportPortrait, getToken, setToken } from '../portrait/vaultPortraits'
+import { vault } from '../vault'
 
 // Dev tool: build a character portrait from parts and copy the spec into a
 // person article's frontmatter. The infobox reads the same spec.
@@ -80,7 +81,7 @@ function VaultSection({ spec, onImport, flash }) {
 
   async function load(force) {
     setError(''); setProgress([0, 1])
-    try { setPeople(await listPeople((d, t) => setProgress([d, t]), force)) }
+    try { setPeople(await vault.people((d, t) => setProgress([d, t]), force)) }
     catch (e) { setError(e.message) }
     setProgress(null)
   }
@@ -93,7 +94,7 @@ function VaultSection({ spec, onImport, flash }) {
     const verb = targetPerson.portrait ? 'overwrite the portrait on' : 'add a portrait to'
     if (!window.confirm(`This commits straight to the vault and will ${verb} "${targetPerson.name}". Continue?`)) return
     setBusy(true)
-    try { await exportPortrait(target, spec); setPeople([...people]); flash(`Saved to ${targetPerson.name}. The site updates on its next rebuild.`) }
+    try { await exportPortrait(target, spec); targetPerson.portrait = JSON.parse(JSON.stringify(spec)); setPeople([...people]); flash(`Saved to ${targetPerson.name}. The site updates on its next rebuild.`) }
     catch (e) { flash(e.message) }
     setBusy(false)
   }

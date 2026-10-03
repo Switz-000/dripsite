@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useFileTree, useClassSchemas, useGeoHierarchy, useFlags, fetchMeta, metaCache, pathToSlug } from '../hooks/useVault'
+import { useFileTree, useClassSchemas, useGeoHierarchy, useFlags, pathToSlug } from '../hooks/useVault'
+import { vault } from '../vault'
 import { flagUrlFor } from '../utils/github'
 import { stripWL } from '../utils/geo'
 import { Loading, ErrorState } from '../components/Loading'
@@ -321,7 +322,7 @@ export default function BrowsePage() {
   // tracks which types have had their frontmatter fetched
   const [fetchedTypes, setFetchedTypes] = useState(new Set())
   const [metaLoading, setMetaLoading]   = useState(false)
-  // bump to re-render after metaCache is populated
+  // bump to re-render after the vault has read the frontmatter
   const [metaVersion, setMetaVersion]   = useState(0)
   const fetchingRef = useRef(new Set())  // prevents duplicate concurrent fetches
 
@@ -379,7 +380,7 @@ export default function BrowsePage() {
     const set = new Map() // normalized -> display
     tree.forEach(f => {
       if (guessTypeFromPath(f.path) !== 'person') return
-      const meta = metaCache.get(f.path)
+      const meta = vault.peekMeta(f.path)
       if (!meta) return
       const raw = meta.occupation
       const list = Array.isArray(raw) ? raw : (raw != null ? [raw] : [])
@@ -411,7 +412,7 @@ export default function BrowsePage() {
     fetchingRef.current.add(selectedType)
     setMetaLoading(true)
 
-    Promise.all(paths.map(p => fetchMeta(p).catch(() => null)))
+    Promise.all(paths.map(p => vault.meta(p).catch(() => null)))
       .then(() => {
         setFetchedTypes(prev => new Set([...prev, selectedType]))
         setMetaVersion(v => v + 1)
@@ -471,7 +472,7 @@ export default function BrowsePage() {
         }
         // Sub-filter (only when meta is available)
         if (hasSubFilters) {
-          const meta = metaCache.get(item.path)
+          const meta = vault.peekMeta(item.path)
           if (!meta) return true  // not yet loaded — show optimistically
           return articleMatchesSubFilters(meta, activeSubFilters)
         }

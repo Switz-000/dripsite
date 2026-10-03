@@ -31,7 +31,7 @@ export function useLinkPreview(ref, tree, { selector = 'a.wikilink, a.ibx-link',
       const mx = e.clientX, my = e.clientY
       const token = ++fetchTokenRef.current
       hoverTimerRef.current = setTimeout(async () => {
-        const data = await fetchPreview(linkSlug, tree)
+        const data = await fetchPreview(linkSlug)
         if (fetchTokenRef.current !== token) return
         if (data) setPopup({ visible: true, x: mx, y: my, data, slug: linkSlug })
       }, 350)

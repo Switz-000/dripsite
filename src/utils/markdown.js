@@ -1,5 +1,5 @@
 import { marked } from 'marked'
-import { isImageFilename, imageUrl } from './github'
+import { isImageFilename, imageUrl } from './github.js'
 
 // ── Frontmatter parser ──────────────────────────────────────
 // Supports: nested mappings, sequences of objects/scalars,

@@ -1,9 +1,7 @@
-import { slugToPath, fetchMarkdown, imageUrl, getFlagMap, flagUrlFor } from './github'
-import { parseFrontmatter, getTitle, extractSummary } from './markdown'
-import { articleCache } from '../hooks/useVault'
+import { flagUrlFor } from './github'
+import { vault } from '../vault'
 
 const previewCache = new Map()
-const WIKI_IMAGE_RE = /!\[\[([^\]|]+\.(?:png|jpg|jpeg|gif|webp|svg|avif))[^\]]*\]\]/i
 const HTML_IMG_RE = /<img[^>]+src="([^"]+)"/
 
 // Country previews show the flag; matched by article filename.
@@ -13,49 +11,26 @@ function countryFlag(type, path, flagMap) {
   return flagUrlFor(base, flagMap)
 }
 
-// A person's drawn portrait (frontmatter `portrait:`), shown instead of an image
-function portraitOf(meta) {
-  return meta?.type === 'person' && meta.portrait && typeof meta.portrait === 'object' ? meta.portrait : null
-}
-
-export async function fetchPreview(slug, tree) {
+export async function fetchPreview(slug) {
   if (previewCache.has(slug)) return previewCache.get(slug)
 
-  const flagMap = await getFlagMap().catch(() => null)
+  const flagMap = await vault.flags().catch(() => null)
 
-  // Fast path: article already fully loaded in articleCache
-  if (articleCache.has(slug)) {
-    const cached = articleCache.get(slug)
-    const flag = countryFlag(cached.meta?.type, cached.path, flagMap)
-    const imgMatch = HTML_IMG_RE.exec(cached.html)
+  try {
+    const article = await vault.article(slug)
+    if (!article) return null
+    const type = article.meta?.type || null
+    const flag = countryFlag(type, article.path, flagMap)
+    const imgMatch = HTML_IMG_RE.exec(article.html)
+    // A person's drawn portrait (frontmatter `portrait:`), shown instead of an image
+    const person = type === 'person' ? await vault.person(slug) : false
     const result = {
-      title: cached.title,
-      type: cached.meta?.type || null,
-      summary: cached.meta?.summary || cached.summary || '',
+      title: article.title,
+      type,
+      summary: article.meta?.summary || article.summary || '',
       imageUrl: flag || (imgMatch ? imgMatch[1] : null),
       imageIsFlag: !!flag,
-      portrait: portraitOf(cached.meta),
-    }
-    previewCache.set(slug, result)
-    return result
-  }
-
-  // Slow path: fetch raw markdown
-  const path = slugToPath(slug, tree)
-  if (!path) return null
-  try {
-    const raw = await fetchMarkdown(path)
-    const { meta, body } = parseFrontmatter(raw)
-    const title = getTitle(meta, path)
-    const flag = countryFlag(meta.type, path, flagMap)
-    const imgMatch = WIKI_IMAGE_RE.exec(body)
-    const result = {
-      title,
-      type: meta.type || null,
-      summary: meta.summary || extractSummary(body),
-      imageUrl: flag || (imgMatch ? imageUrl(imgMatch[1]) : null),
-      imageIsFlag: !!flag,
-      portrait: portraitOf(meta),
+      portrait: person ? person.portrait : null,
     }
     previewCache.set(slug, result)
     return result

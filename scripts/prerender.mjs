@@ -35,12 +35,14 @@ const SHELL = path.join(DIST, 'index.html')
 if (!fs.existsSync(SHELL)) throw new Error('dist/index.html not found. Run `vite build` first.')
 
 // ── 1. Vault ──────────────────────────────────────────────────
+// The same vault module the browser uses, reading from disk (src/vault)
 const vault = await loadVault()
+const tree = (await vault.tree()).map(f => f.path)
 
 // slug -> vault path. When two articles share a slug, the first one wins,
 // which is also what the site does when it resolves a URL.
 const bySlug = new Map()
-for (const p of vault.articles) {
+for (const p of tree) {
   const slug = pathToSlug(p)
   if (bySlug.has(slug)) {
     console.warn(`prerender: "${p}" has the same slug as "${bySlug.get(slug)}" (/article/${slug}); only the first is reachable`)
@@ -56,15 +58,14 @@ await build({
 })
 const ssr = await import(pathToFileURL(path.resolve('.ssr/entry-server.js')).href)
 
-const tree = vault.articles
-const treeObjects = tree.map(p => ({ path: p, type: 'blob' }))
-const flags = [...ssr.buildFlagMap(vault.files.map(p => ({ path: p, type: 'blob' })))]
-const license = vault.exists('LICENSE') ? vault.read('LICENSE') : null
+const flagMap = await vault.flags()
+const flags = [...flagMap]
+const license = await vault.textOrNull('LICENSE')
 // Written by generate_chronology.py in dripwiki. A vault without it simply
 // has no chronology page.
-const chronology = vault.exists('chronology.json') ? JSON.parse(vault.read('chronology.json')) : null
+const chronologyText = await vault.textOrNull('chronology.json')
+const chronology = chronologyText == null ? null : JSON.parse(chronologyText)
 if (!chronology) console.warn('prerender: no chronology.json in the vault, /chronology not written')
-const flagMap = new Map(flags)
 
 // ── 3. Pages ──────────────────────────────────────────────────
 const template = fs.readFileSync(SHELL, 'utf8')
@@ -127,21 +128,9 @@ function writePage(url, { title, description, type = 'website', data, image = SI
 }
 
 // Portraits for the people an article's lists name (see src/utils/peopleLists.js)
-const personCache = new Map()   // slug -> { portrait } | false
-function personAt(slug) {
-  if (!personCache.has(slug)) {
-    const p = bySlug.get(slug)
-    let person = false
-    if (p) {
-      const { meta } = ssr.parseFrontmatter(vault.read(p))
-      if (meta.type === 'person') person = { portrait: meta.portrait && typeof meta.portrait === 'object' ? meta.portrait : null }
-    }
-    personCache.set(slug, person)
-  }
-  return personCache.get(slug)
-}
-function peopleFor(article) {
-  return Object.fromEntries(ssr.candidateSlugs(article.html).map(s => [s, personAt(s)]))
+async function peopleFor(article) {
+  const slugs = ssr.candidateSlugs(article.html)
+  return Object.fromEntries(await Promise.all(slugs.map(async s => [s, await vault.person(s)])))
 }
 
 // Articles
@@ -149,8 +138,8 @@ let written = 0
 const failed = []
 for (const [slug, articlePath] of bySlug) {
   try {
-    const article = ssr.buildArticle(slug, articlePath, vault.read(articlePath), treeObjects)
-    const people = peopleFor(article)
+    const article = await vault.article(slug)
+    const people = await peopleFor(article)
     writePage(`/article/${slug}`, {
       title: `${article.title} — ${SITE.name}`,   // same format as ArticlePage
       description: describe(article),

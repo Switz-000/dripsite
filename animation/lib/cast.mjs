@@ -2,6 +2,8 @@
 // plus placeholder characters from cast-extra.json (people with no article or spec yet).
 // Node only. Run it to see who can be animated:  npm run cast
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url'
+import { walk } from '../../scripts/vault.mjs'
+import { isArticlePath, FLAGS_PATH } from '../../src/utils/github.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 /* the vault: VAULT_DIR if set, else the sibling folder on Martín's PC, else ../.vault from a site build */
@@ -25,20 +27,19 @@ export function readPortrait(raw){
   }
   return o
 }
-function walk(d, out=[]){ for (const f of fs.readdirSync(d)){ if (f.startsWith('.')) continue; const p = path.join(d,f); fs.statSync(p).isDirectory() ? walk(p,out) : f.endsWith('.md') && out.push(p) } return out }
 
 export function loadCast(){
   const dir = vaultDir(), cast = {}
-  for (const p of walk(dir)){
-    const raw = fs.readFileSync(p,'utf8'); if (!/\nportrait:/.test(raw.slice(0, 20000))) continue
+  for (const p of walk(dir).filter(isArticlePath)){
+    const raw = fs.readFileSync(path.join(dir,p),'utf8'); if (!/\nportrait:/.test(raw.slice(0, 20000))) continue
     const spec = readPortrait(raw)
-    if (spec) cast[path.basename(p,'.md')] = { spec, article: path.relative(dir,p) }
+    if (spec) cast[path.basename(p,'.md')] = { spec, article: p }
   }
   const extra = JSON.parse(fs.readFileSync(path.join(HERE,'../cast-extra.json'),'utf8'))
   for (const [name,e] of Object.entries(extra)) if (!name.startsWith('_') && !cast[name]) cast[name] = { ...e, placeholder:true }
   return cast
 }
-export function flagPath(country){ return path.join(vaultDir(), '00 - Meta/Images/Country Flags', country + '.png') }
+export function flagPath(country){ return path.join(vaultDir(), FLAGS_PATH, country + '.png') }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])){
   const c = loadCast()

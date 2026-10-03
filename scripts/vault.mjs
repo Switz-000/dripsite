@@ -1,8 +1,9 @@
 // ============================================================
-// VAULT LOADER (build time, plain Node)
+// VAULT ON DISK (build time, plain Node)
 // ============================================================
-// Puts the dripwiki vault on disk and lists its articles, using the same
-// rule the browser uses (isArticlePath in src/utils/github.js).
+// Puts the dripwiki vault on disk and reads it through the same vault
+// module the browser uses (src/vault), with files as the source instead
+// of GitHub.
 //
 // By default it downloads the whole repo as one .tar.gz archive: a single
 // request, and not part of GitHub's rate-limited API. For a local run,
@@ -13,24 +14,31 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { REPO_CONFIG, isArticlePath } from '../src/utils/github.js'
+import { REPO_CONFIG } from '../src/utils/github.js'
 
 const DEFAULT_DIR = path.resolve('.vault')
 
+// The vault for a build: downloaded, or the folder VAULT_DIR names
 export async function loadVault() {
   const dir = process.env.VAULT_DIR ? path.resolve(process.env.VAULT_DIR) : DEFAULT_DIR
   if (!process.env.VAULT_DIR) await download(dir)
 
-  const files = walk(dir)
-  const articles = files.filter(isArticlePath)
-  if (articles.length === 0) throw new Error(`No articles found in ${dir}`)
+  // Imported here, not at the top: the animation tool uses diskAdapter and
+  // walk from this file without needing the site's markdown renderer
+  const { createVault } = await import('../src/vault/vault.js')
+  const vault = createVault(diskAdapter(dir))
+  if ((await vault.tree()).length === 0) throw new Error(`No articles found in ${dir}`)
+  return vault
+}
 
+// The vault module's way into a folder on disk (see src/vault/vault.js)
+export function diskAdapter(dir) {
   return {
-    dir,
-    files,                                      // every file, vault-relative, "/" separated
-    articles,                                   // just the articles, same format
-    read: p => fs.readFileSync(path.join(dir, p), 'utf8'),
-    exists: p => fs.existsSync(path.join(dir, p)),
+    listFiles: async () => walk(dir),
+    readText: async p => {
+      try { return fs.readFileSync(path.join(dir, p), 'utf8') }
+      catch (e) { if (e.code === 'ENOENT') return null; throw e }
+    },
   }
 }
 
@@ -73,7 +81,7 @@ async function download(dir) {
 }
 
 // Every file under dir, as sorted "/"-separated paths relative to dir
-function walk(dir, rel = '') {
+export function walk(dir, rel = '') {
   const out = []
   for (const entry of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
     const p = rel ? `${rel}/${entry.name}` : entry.name

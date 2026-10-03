@@ -9,8 +9,7 @@ import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import App from './App'
 
-export { primeVault, buildArticle } from './hooks/useVault'
-export { buildFlagMap } from './utils/github'
+export { primeVault } from './hooks/useVault'
 export { infoboxImageOf, countryFlagOf } from './utils/articleImage'
 
 export function render(url) {
@@ -21,4 +20,3 @@ export function render(url) {
   )
 }
 export { candidateSlugs } from './utils/peopleLists'
-export { parseFrontmatter } from './utils/markdown'

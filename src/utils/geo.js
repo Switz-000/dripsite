@@ -98,8 +98,9 @@ export function citySize(pop) {
 
 const UNGROUPED = 'Ungrouped'
 
-// Build the hierarchy from already-fetched metas (metaCache: Map<path, meta>).
-export function buildGeoHierarchy(tree, metaCache) {
+// Build the hierarchy from already-read frontmatter (metaOf: path -> meta, or
+// undefined for a file that hasn't been read).
+export function buildGeoHierarchy(tree, metaOf) {
   const countries = []           // [{ name }]
   const statesByCountry = new Map()  // countryLower -> [{ name }]
   const citiesByState = new Map()    // stateLower -> [{ name }]
@@ -108,7 +109,7 @@ export function buildGeoHierarchy(tree, metaCache) {
   const stateNames = new Set()
 
   for (const f of tree || []) {
-    const meta = metaCache.get(f.path) || {}
+    const meta = metaOf(f.path) || {}
     const t = resolveGeoType(f.path, meta)
     if (!t) continue
     const name = cleanName(f.path)

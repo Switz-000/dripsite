@@ -1,20 +1,7 @@
 import { useState, useEffect, useMemo, useReducer } from 'react'
 import { candidateSlugs } from '../utils/peopleLists'
-import {
-  getFileTree,
-  getFlagMap,
-  fetchMarkdown,
-  pathToSlug,
-  slugToPath,
-  rawFileUrl,
-  wikilinkToSlug as resolveWikilink,
-} from '../utils/github'
-import {
-  renderMarkdown,
-  parseFrontmatter,
-  getTitle,
-  extractSummary,
-} from '../utils/markdown'
+import { pathToSlug, slugToPath } from '../utils/github'
+import { vault } from '../vault'
 import { fetchClassSchemas } from '../utils/classSchema'
 import {
   geoPathsFromTree,
@@ -27,43 +14,20 @@ import {
 } from '../utils/geo'
 import { COUNTRIES, STATES, CITIES } from '../data/mapData'
 
-// Module-level caches — survive re-renders and re-mounts
-export const articleCache = new Map()
-export const metaCache = new Map()   // path -> frontmatter meta (lightweight)
-export const peopleCache = {}       // slug -> { portrait } for a person article, false for anything else
-let treeCache = null
-let treePending = null   // in-flight promise, deduplicated
-let treeFromBuild = false  // true while treeCache is the copy baked into the page
+// React's view of the vault (src/vault). Reading, caching and the rules
+// about articles and people live there; these hooks only subscribe a
+// component to an answer.
 
 export function useFileTree() {
-  const [tree, setTree] = useState(treeCache)
-  const [loading, setLoading] = useState(!treeCache)
+  // The copy baked into the page, if any, is on screen from the first render
+  const [tree, setTree] = useState(vault.peekTree())
+  const [loading, setLoading] = useState(!vault.peekTree())
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Already have the live tree from GitHub
-    if (treeCache && !treeFromBuild) {
-      setTree(treeCache)
-      setLoading(false)
-      return
-    }
-
-    // Nothing yet, or only the build-time copy (which is already on screen,
-    // so this just refreshes it in the background). Deduplicated across
-    // every component that asks at the same time.
-    if (!treePending) {
-      treePending = getFileTree()
-        .then(t => {
-          // Keep the old array when nothing changed, so pages don't redo work
-          if (!(treeCache && samePaths(treeCache, t))) treeCache = t
-          treeFromBuild = false
-          return treeCache
-        })
-        .finally(() => { treePending = null })
-    }
-
     let alive = true
-    treePending
+    // One listing for the whole visit, shared by every component that asks
+    vault.tree()
       .then(t => {
         if (!alive) return
         setTree(t)
@@ -72,7 +36,7 @@ export function useFileTree() {
       .catch(e => {
         if (!alive) return
         // If GitHub fails but the page came with a tree, keep using that
-        if (!treeCache) setError(e.message)
+        if (!vault.peekTree()) setError(e.message)
         setLoading(false)
       })
     return () => { alive = false }
@@ -81,51 +45,10 @@ export function useFileTree() {
   return { tree, loading, error }
 }
 
-function samePaths(a, b) {
-  return a.length === b.length && a.every((f, i) => f.path === b[i].path)
-}
-
-// Turns a vault file into the article object the pages render. Used for
-// live fetches here, and by the prerender at build time, so both produce
-// exactly the same thing.
-export function buildArticle(slug, path, raw, tree) {
-  const wikilinkFn = (text) => resolveWikilink(text, tree)
-  const { meta, html } = renderMarkdown(raw, tree, wikilinkFn)
-  const { body } = parseFrontmatter(raw)
-  return {
-    slug,
-    path,
-    title: getTitle(meta, path),
-    meta,
-    html,
-    summary: extractSummary(body),
-  }
-}
-
-// Build-time articles get one background check against GitHub per visit.
-// Keyed by slug so repeated effect runs share the same request.
-const refreshes = new Map()
-
-function refreshArticle(built, tree) {
-  if (!refreshes.has(built.slug)) {
-    const p = fetchMarkdown(built.path)
-      .then(raw => {
-        const live = buildArticle(built.slug, built.path, raw, tree)
-        articleCache.set(built.slug, live)
-        const changed = live.html !== built.html ||
-          JSON.stringify(live.meta) !== JSON.stringify(built.meta)
-        return changed ? live : null
-      })
-      .catch(() => null)   // keep showing the build-time copy
-    refreshes.set(built.slug, p)
-  }
-  return refreshes.get(built.slug)
-}
-
 export function useArticle(slug) {
-  // An article baked into the page at build time is already in the cache,
+  // An article baked into the page at build time is already known,
   // so it renders on the very first pass, with no spinner
-  const cached = slug ? articleCache.get(slug) : undefined
+  const cached = slug ? vault.peekArticle(slug) : undefined
   const [article, setArticle] = useState(cached || null)
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState(null)
@@ -142,79 +65,52 @@ export function useArticle(slug) {
       return
     }
 
-    // Return from cache instantly
-    if (articleCache.has(slug)) {
-      const hit = articleCache.get(slug)
+    let alive = true
+    const hit = vault.peekArticle(slug)
+    if (hit) {
       setArticle(hit)
       setLoading(false)
 
       // A build-time copy may be older than the vault: check GitHub in the
       // background and swap in the live version only if it changed
       if (hit.fromBuild) {
-        let alive = true
-        refreshArticle(hit, tree).then(live => { if (alive && live) setArticle(live) })
-        return () => { alive = false }
+        vault.refreshArticle(slug).then(live => { if (alive && live) setArticle(live) })
       }
-      return
+      return () => { alive = false }
     }
 
     setLoading(true)
     setError(null)
 
-    const path = slugToPath(slug, tree)
-    if (!path) {
-      setError(`Article not found. The link may be outdated or the article does not exist.`)
-      setLoading(false)
-      return
-    }
-
-    fetchMarkdown(path)
-      .then(raw => {
-        const result = buildArticle(slug, path, raw, tree)
-        articleCache.set(slug, result)
-        setArticle(result)
+    vault.article(slug)
+      .then(result => {
+        if (!alive) return
+        if (result) setArticle(result)
+        else setError(`Article not found. The link may be outdated or the article does not exist.`)
         setLoading(false)
       })
       .catch(e => {
+        if (!alive) return
         setError(e.message)
         setLoading(false)
       })
+    return () => { alive = false }
   }, [slug, tree, treeLoading, treeError])
 
   return { article, loading, error }
 }
 
-export function useSearchIndex() {
-  const { tree } = useFileTree()
-  const [index, setIndex] = useState([])
-
-  useEffect(() => {
-    if (!tree) return
-    setIndex(tree.map(f => ({
-      slug:     pathToSlug(f.path),
-      title:    f.path.split('/').pop().replace(/\.md$/, ''),
-      path:     f.path,
-      // Human-readable folder path for display
-      folder:   f.path.split('/').slice(0, -1).map(p => p.replace(/^\d+ - /, '')).join(' / '),
-    })))
-  }, [tree])
-
-  return index
-}
-
 // ── Country flags ─────────────────────────────────────────────
-// Map of lowercase country name -> flag image URL. Shares the same
-// underlying tree fetch as useFileTree, so it costs no extra request.
-let _flagsCache = null
-
+// Map of lowercase country name -> flag image URL. Comes from the same
+// listing as the file tree, so it costs no extra request.
 export function useFlags() {
-  const [flags, setFlags] = useState(_flagsCache)
+  const [flags, setFlags] = useState(vault.peekFlags())
 
   useEffect(() => {
-    if (_flagsCache) return
+    if (vault.peekFlags()) return
     let alive = true
-    getFlagMap()
-      .then(m => { _flagsCache = m; if (alive) setFlags(m) })
+    vault.flags()
+      .then(m => { if (alive) setFlags(m) })
       .catch(() => {})
     return () => { alive = false }
   }, [])
@@ -252,7 +148,7 @@ export function useGeoHierarchy(tree, enabled) {
 
     const paths = geoPathsFromTree(tree)
     if (paths.length === 0) {
-      _geoCache = buildGeoHierarchy(tree, metaCache)
+      _geoCache = buildGeoHierarchy(tree, vault.peekMeta)
       _geoTreeRef = tree
       setHierarchy(_geoCache)
       return
@@ -261,9 +157,9 @@ export function useGeoHierarchy(tree, enabled) {
     setLoading(true)
     if (!_geoPending || _geoTreeRef !== tree) {
       _geoTreeRef = tree
-      _geoPending = Promise.all(paths.map(p => fetchMeta(p).catch(() => null)))
+      _geoPending = Promise.all(paths.map(p => vault.meta(p).catch(() => null)))
         .then(() => {
-          _geoCache = buildGeoHierarchy(tree, metaCache)
+          _geoCache = buildGeoHierarchy(tree, vault.peekMeta)
           _geoPending = null
           return _geoCache
         })
@@ -280,7 +176,7 @@ export function useGeoHierarchy(tree, enabled) {
 // { label, cx, cy }) with data derived from vault frontmatter: population,
 // size class, state assignment, capital marker, and the article slug.
 // All of a country's state+city frontmatter is fetched in one parallel
-// burst on first use (deduped by metaCache), then cached per country.
+// burst on first use (the vault reads each file once), then cached per country.
 const _countryGeoCache = new Map()   // country.id -> { states, cities }
 
 async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
@@ -298,10 +194,10 @@ async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
 
   // Country's own meta too — capital source for countries without states
   const countryMetaPromise = country.article
-    ? fetchMeta(country.article + '.md').catch(() => null)
+    ? vault.meta(country.article + '.md').catch(() => null)
     : Promise.resolve(null)
 
-  await Promise.all(paths.map(p => fetchMeta(p).catch(() => null)))
+  await Promise.all(paths.map(p => vault.meta(p).catch(() => null)))
   const countryMeta = await countryMetaPromise
 
   // Filename (lowercase) -> article path, split by kind
@@ -315,7 +211,7 @@ async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
 
   const states = (stateDefs || []).map(s => {
     const articlePath = statePathByName.get(s.label.toLowerCase()) || null
-    const meta = articlePath ? metaCache.get(articlePath) : null
+    const meta = articlePath ? vault.peekMeta(articlePath) : null
     return {
       id: slugId(s.label),
       label: s.label,
@@ -333,7 +229,7 @@ async function buildCountryGeo(country, stateDefs, cityDefs, tree) {
 
   const cities = (cityDefs || []).map(c => {
     const articlePath = cityPathByName.get(c.label.toLowerCase()) || null
-    const meta = articlePath ? metaCache.get(articlePath) : null
+    const meta = articlePath ? vault.peekMeta(articlePath) : null
     const pop = latestPopulation(meta)
     const stateName = meta ? stripWL(meta.state) : ''
     const stateId = stateName ? slugId(stateName) : null
@@ -425,26 +321,6 @@ export function useWorldCities() {
   return cities
 }
 
-// ── Lightweight frontmatter fetch ─────────────────────────────
-// Fetches just the frontmatter for an article path. Checks metaCache first,
-// then articleCache (populated when full articles are visited), then fetches.
-export async function fetchMeta(path) {
-  if (metaCache.has(path)) return metaCache.get(path)
-
-  // Reuse already-fetched full articles
-  for (const article of articleCache.values()) {
-    if (article.path === path) {
-      metaCache.set(path, article.meta)
-      return article.meta
-    }
-  }
-
-  const raw = await fetchMarkdown(path)
-  const { meta } = parseFrontmatter(raw)
-  metaCache.set(path, meta)
-  return meta
-}
-
 // ── License text (landing page) ───────────────────────────────
 // Read straight from the LICENSE file in dripwiki, so the site never
 // keeps a second copy. undefined = not loaded yet, null = no LICENSE file.
@@ -455,8 +331,7 @@ export function useLicense() {
 
   useEffect(() => {
     if (licenseCache !== undefined) return
-    fetch(rawFileUrl('LICENSE'))
-      .then(res => (res.ok ? res.text() : null))
+    vault.textOrNull('LICENSE')
       .then(t => { licenseCache = t; setText(t) })
       .catch(() => setText(null))
   }, [])
@@ -476,8 +351,8 @@ export function useChronology() {
 
   useEffect(() => {
     if (chronologyCache !== undefined && chronologyCache !== null && !chronologyCache.fromBuild) return
-    fetch(rawFileUrl('chronology.json'))
-      .then(res => (res.ok ? res.json() : null))
+    vault.textOrNull('chronology.json')
+      .then(t => (t == null ? null : JSON.parse(t)))
       .then(d => { chronologyCache = d; setData(d) })
       .catch(() => { if (chronologyCache === undefined) { chronologyCache = null; setData(null) } })
   }, [])
@@ -486,19 +361,13 @@ export function useChronology() {
 }
 
 // ── Build-time data ───────────────────────────────────────────
-// Fills the caches above with data baked into a prerendered page (see
+// Hands the vault the data baked into a prerendered page (see
 // scripts/prerender.mjs), so the hooks render it on the very first pass
 // instead of showing a spinner and fetching it again. Called by main.jsx in
 // the browser, and by the prerender in Node before it renders each page.
 // Anything baked in is still refreshed from GitHub in the background.
-export function primeVault({ tree, flags, article, license, chronology, people } = {}) {
-  if (people) Object.assign(peopleCache, people)
-  if (tree) {
-    treeCache = tree.map(path => ({ path, type: 'blob' }))
-    treeFromBuild = true
-  }
-  if (flags) _flagsCache = new Map(flags)
-  if (article) articleCache.set(article.slug, { ...article, fromBuild: true })
+export function primeVault({ license, chronology, ...data } = {}) {
+  vault.prime(data)
   if (license !== undefined) licenseCache = license
   if (chronology !== undefined) {
     chronologyCache = chronology && { ...chronology, fromBuild: true }
@@ -508,28 +377,24 @@ export function primeVault({ tree, flags, article, license, chronology, people }
 export { pathToSlug, slugToPath }
 
 // ── People named in lists ─────────────────────────────────────
-// Who the article's lists name, so their portraits can sit beside them. The
-// build bakes this into the page (people); anything it didn't know about,
-// such as a link added since the last build, is looked up here.
+// Who the article's lists name, so their portraits can sit beside them:
+// slug -> { portrait } for a person, false for anything else. The build
+// bakes this into the page; anything it didn't know about, such as a link
+// added since the last build, is asked of the vault here.
 export function usePeople(html, tree) {
   const [, refresh] = useReducer(n => n + 1, 0)
   const slugs = useMemo(() => candidateSlugs(html || ''), [html])
 
   useEffect(() => {
     if (!tree) return
-    const missing = slugs.filter(s => !(s in peopleCache))
+    const missing = slugs.filter(s => vault.peekPerson(s) === undefined)
     if (!missing.length) return
     let alive = true
-    Promise.all(missing.map(async slug => {
-      const path = slugToPath(slug, tree)
-      if (!path) { peopleCache[slug] = false; return }
-      try {
-        const meta = await fetchMeta(path)
-        peopleCache[slug] = meta?.type === 'person' ? { portrait: meta.portrait || null } : false
-      } catch { /* leave it unknown; no portrait is fine */ }
-    })).then(() => { if (alive) refresh() })
+    // A failed lookup stays unknown; no portrait is fine
+    Promise.all(missing.map(s => vault.person(s).catch(() => {})))
+      .then(() => { if (alive) refresh() })
     return () => { alive = false }
   }, [slugs, tree])
 
-  return peopleCache
+  return Object.fromEntries(slugs.map(s => [s, vault.peekPerson(s)]))
 }
