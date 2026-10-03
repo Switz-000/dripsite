@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useArticle, useFileTree, useFlags, usePeople } from '../hooks/useVault'
-import { getTypeLabel } from '../utils/markdown'
+import { singularLabel } from '../utils/articleTypes.js'
 import { wikilinkToSlug, pathToSlug } from '../utils/github'
 import { infoboxImageOf, countryFlagOf } from '../utils/articleImage'
 import { decoratePeople } from '../utils/peopleLists'
@@ -73,7 +73,7 @@ export default function ArticlePage() {
 
   if (!article) return null
 
-  const typeLabel = getTypeLabel(article.meta)
+  const typeLabel = singularLabel(article.meta.type)
   const crumbs = getBreadcrumb(article.path)
 
   const infoboxImage = infoboxImageOf(article)

@@ -213,26 +213,3 @@ export function getTitle(meta, path) {
   if (meta.name)            return meta.name
   return path.split('/').pop().replace(/\.md$/, '')
 }
-
-export function getTypeLabel(meta) {
-  const typeMap = {
-    person:       'Person',
-    company:      'Corporation',
-    state:        'State',
-    city:         'City',
-    country:      'Country',
-    institution:  'Institution',
-    law:          'Legislation',
-    event:        'Event',
-    war:          'Conflict',
-    concept:      'Concept',
-    tradition:    'Tradition',
-    organization: 'Organization',
-    sport:        'Sport',
-    technology:   'Technology',
-    structure:    'Structure',
-    document:     'Document',
-    religion:     'Religion',
-  }
-  return typeMap[meta.type] || null
-}

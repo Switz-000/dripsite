@@ -1,19 +1,11 @@
 import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Portrait from '../portrait/Portrait'
-
-// ── Wikilink helpers ────────────────────────────────────────────────
-// Parses [[Target]] or [[Target|Display]] or [[Page#Section]]
-function parseWL(s) {
-  if (typeof s !== 'string') return null
-  const m = s.match(/^\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]$/)
-  if (!m) return null
-  const rawTarget = m[1].trim()
-  const fragIdx = rawTarget.indexOf('#')
-  const page = fragIdx >= 0 ? rawTarget.slice(0, fragIdx) : rawTarget
-  const defaultDisplay = fragIdx >= 0 ? rawTarget.slice(fragIdx + 1) : rawTarget
-  return { page, display: m[2] ? m[2].trim() : defaultDisplay }
-}
+import {
+  personRecord, hasValue, compact, parseWikilink, isConvicted,
+  occupations, quickStats as quickStatsOf, titleKicker, tabs as tabsOf,
+  lifeline, parties as partiesOf, organizations as organizationsOf,
+} from '../person/record.js'
 
 // Renders any value that may contain [[wikilinks]], arrays, booleans, or scalars
 function Field({ value, wikilinkFn, missing = '—' }) {
@@ -50,214 +42,6 @@ function Field({ value, wikilinkFn, missing = '—' }) {
   }
   if (last < s.length) parts.push(s.slice(last))
   return parts.length ? <>{parts}</> : <>{s}</>
-}
-
-// ── Data utilities ──────────────────────────────────────────────────
-// Deep emptiness test — treats null, '', empty arrays and all-empty objects as
-// empty, recursively. Boolean `false` also counts as empty, so template default
-// flags like `posthumous: false` don't make an otherwise-blank entry look filled.
-function hasVal(v) {
-  if (v == null) return false
-  if (typeof v === 'boolean') return v === true
-  if (Array.isArray(v)) return v.some(hasVal)
-  if (typeof v === 'object') return Object.values(v).some(hasVal)
-  return String(v).trim() !== ''
-}
-
-function compact(arr) {
-  if (!Array.isArray(arr)) return []
-  return arr.filter(hasVal)
-}
-
-function has(v) {
-  return hasVal(v)
-}
-
-// Strip [[wikilink]] brackets for plain text display
-function stripWL(v) {
-  if (!v) return ''
-  const wl = parseWL(String(v))
-  return wl ? wl.display : String(v)
-}
-
-// ── Normalization — supports old flat format and new nested format ──
-function normalizeMeta(raw) {
-  const rec = { ...raw }
-  // birth: support both birth.year (new) and birth_year (old flat)
-  if (!rec.birth && (rec.birth_year || rec.birth_city)) {
-    rec.birth = {
-      year: rec.birth_year ?? null,
-      city: rec.birth_city ?? null,
-      state: rec.birth_state ?? null,
-      country: rec.birth_country ?? null,
-    }
-  }
-  // death: support both death.year (new) and death_year (old flat)
-  if (!rec.death && (rec.death_year || rec.death_city)) {
-    rec.death = {
-      year: rec.death_year ?? null,
-      city: rec.death_city ?? null,
-      state: rec.death_state ?? null,
-      country: rec.death_country ?? null,
-      cause: rec.death_cause ?? null,
-    }
-  }
-  // aliases: string → array
-  if (typeof rec.aliases === 'string') {
-    rec.aliases = rec.aliases.split(',').map(s => s.trim()).filter(Boolean)
-  }
-  // occupation: "Lawyer, Politician" string → array
-  if (typeof rec.occupation === 'string') {
-    rec.occupation = rec.occupation.split(',').map(s => s.trim()).filter(Boolean)
-  }
-  // criminal_charges: string[] → object[]
-  if (Array.isArray(rec.criminal_charges)) {
-    rec.criminal_charges = rec.criminal_charges.map(c =>
-      typeof c === 'string' ? { charge: c } : c
-    )
-  }
-  // titles: formal offices/seats (elected or appointed). Map to a single
-  // internal shape so the rest of the component reads start/end/_parties
-  // regardless of source format. _parties is kept as the raw array (may
-  // contain [[wikilinks]]) so each consumer can decide to render it as links
-  // (titles list) or as plain text (lifeline).
-  if (Array.isArray(rec.titles)) {
-    rec.titles = rec.titles.map(t => {
-      if (!t || typeof t !== 'object') return t
-      return {
-        ...t,
-        start: t.start_year ?? null,
-        end: t.end_year ?? null,
-        _parties: Array.isArray(t.parties) ? t.parties.filter(Boolean) : [],
-      }
-    })
-  }
-  // roles: jobs held, distinct from titles — never build a "holder list".
-  if (Array.isArray(rec.roles)) {
-    rec.roles = rec.roles.map(r => {
-      if (!r || typeof r !== 'object') return r
-      return {
-        ...r,
-        start: r.start_year ?? null,
-        end: r.end_year ?? null,
-      }
-    })
-  }
-  return rec
-}
-
-// ── Office ranking for quick stats ─────────────────────────────────
-function officeRank(o) {
-  const t = (o?.title || '').toLowerCase()
-  if (/(emperor|empress|king|queen|tsar|sovereign)/.test(t)) return 100
-  if (/(president|head of state|presiding councillor)/.test(t)) return 90
-  if (/(prime minister|premier|chancellor|head of government)/.test(t)) return 85
-  if (/(governor|viceroy|grand duke)/.test(t)) return 80
-  if (/(minister|secretary|councillor)/.test(t)) return 60
-  if (/(senator|deputy|representative|legislator)/.test(t)) return 45
-  if (/(mayor|burgomaster)/.test(t)) return 40
-  if (/(judge|justice)/.test(t)) return 35
-  return 10
-}
-
-function highestOffice(offices) {
-  if (!offices?.length) return null
-  return [...offices].sort((a, b) => officeRank(b) - officeRank(a))[0]
-}
-
-// The article a title's [[wikilink]] points to, for the quick-stats link
-function officeLink(o) {
-  const m = /\[\[([^\]|#]+)/.exec(o?.title || '')
-  return m ? m[1].trim() : null
-}
-
-function shortOffice(o) {
-  return (o.title || '')
-    .replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2')
-    .replace(/^Presiding /, 'Pres. ')
-    .replace(/^President /, 'Pres. ')
-    .replace(/^Member of the General Government of the .*/, 'Gen. Gov.')
-    .replace(/ of the Federated.*$/, '')
-    .replace(/ of the .*$/, '')
-    .replace(/ of .*$/, '')
-    .trim() || ((o._parties || []).map(p => stripWL(String(p))).join(', ') || '')
-}
-
-function shortenTitle(t) {
-  if (!t) return ''
-  return t
-    .replace(/^Presiding /, 'Pres. ')
-    .replace(/^Member of the General Government of the .*/, 'Gen. Gov. Member')
-    .replace(/ of the Federated.*$/, '')
-    .replace(/ of the .*$/, '')
-    .replace(/ of .*$/, '')
-}
-
-function buildQuickStats(rec) {
-  const out = []
-  if (rec.birth?.year && rec.death?.year) {
-    out.push({ label: 'Age at death', value: rec.death.year - rec.birth.year, unit: 'yrs' })
-  }
-  const titles = compact(rec.titles)
-  if (titles.length) {
-    const o = highestOffice(titles)
-    if (o) out.push({
-      label: titles.length > 1 ? 'Highest office' : 'Office',
-      value: `${o.start ?? '?'}–${String(o.end ?? '').slice(-2) || '?'}`,
-      sub: shortOffice(o),
-      subLink: officeLink(o),
-    })
-  }
-  const awards = compact(rec.awards)
-  if (awards.length && out.length < 3) {
-    out.push({
-      label: awards.length > 1 ? 'Honours' : 'Honour',
-      value: awards.length,
-      sub: awards.every(a => a.posthumous) ? 'posthumous' : 'awarded',
-    })
-  }
-  const charges = compact(rec.criminal_charges)
-  if (charges.length && out.length < 3) {
-    out.push({
-      label: 'Charges',
-      value: charges.length,
-      sub: charges.some(c => /guilty/i.test(c.verdict || '')) ? 'convicted' : '—',
-    })
-  }
-  return out.slice(0, 3)
-}
-
-function titleKicker(rec) {
-  const parts = []
-  const occ = compact(rec.occupation)
-  if (occ.length) {
-    const first = occ[0]
-    parts.push(typeof first === 'string' ? first : (first.title || ''))
-  }
-  const charges = compact(rec.criminal_charges)
-  if (charges.some(c => /treason|sedition|rebellion/i.test(c.charge || '')) && rec.death?.cause) {
-    parts.push('Martyr')
-  }
-  return parts.join(' · ') || (rec.type || 'Person')
-}
-
-function buildTabs(rec) {
-  const tabs = []
-  if (['native_name','aliases','sex','ethnicity','religion','citizenship','nationality','birth','death','spouse','children_count','enhanced']
-      .some(k => has(rec[k]))) {
-    tabs.push({ id: 'facts', label: 'Facts' })
-  }
-  if (['occupation','education','titles','roles','party','parties','organization','organizations','political_alignment','military_service']
-      .some(k => has(rec[k]))) {
-    tabs.push({ id: 'career', label: 'Career' })
-  }
-  if (['known_for','awards','era','historical_period','written_works'].some(k => has(rec[k]))) {
-    tabs.push({ id: 'legacy', label: 'Legacy' })
-  }
-  if (has(rec.criminal_charges)) {
-    tabs.push({ id: 'record', label: 'Record' })
-  }
-  return tabs
 }
 
 // ── Portrait + title overlay ────────────────────────────────────────
@@ -338,15 +122,15 @@ function FactsPanel({ rec, wikilinkFn }) {
   const W = ({ v }) => <Field value={v} wikilinkFn={wikilinkFn} />
   return (
     <div className="ibx-dl">
-      {has(rec.native_name) && <Row label="Native name"><W v={rec.native_name} /></Row>}
-      {has(rec.lusitanized_name) && <Row label="Romanized"><W v={rec.lusitanized_name} /></Row>}
-      {has(rec.aliases) && <Row label="Also known as"><W v={rec.aliases} /></Row>}
-      {has(rec.sex) && <Row label="Sex"><W v={rec.sex} /></Row>}
-      {has(rec.ethnicity) && <Row label="Ethnicity"><W v={rec.ethnicity} /></Row>}
-      {has(rec.religion) && <Row label="Religion"><W v={rec.religion} /></Row>}
-      {has(rec.citizenship) && <Row label="Citizenship"><W v={rec.citizenship} /></Row>}
-      {has(rec.nationality) && <Row label="Nationality"><W v={rec.nationality} /></Row>}
-      {has(rec.birth) && (
+      {hasValue(rec.native_name) && <Row label="Native name"><W v={rec.native_name} /></Row>}
+      {hasValue(rec.lusitanized_name) && <Row label="Romanized"><W v={rec.lusitanized_name} /></Row>}
+      {hasValue(rec.aliases) && <Row label="Also known as"><W v={rec.aliases} /></Row>}
+      {hasValue(rec.sex) && <Row label="Sex"><W v={rec.sex} /></Row>}
+      {hasValue(rec.ethnicity) && <Row label="Ethnicity"><W v={rec.ethnicity} /></Row>}
+      {hasValue(rec.religion) && <Row label="Religion"><W v={rec.religion} /></Row>}
+      {hasValue(rec.citizenship) && <Row label="Citizenship"><W v={rec.citizenship} /></Row>}
+      {hasValue(rec.nationality) && <Row label="Nationality"><W v={rec.nationality} /></Row>}
+      {hasValue(rec.birth) && (
         <Row label="Born">
           {rec.birth.city && <Field value={rec.birth.city} wikilinkFn={wikilinkFn} />}
           {rec.birth.state && <>, <Field value={rec.birth.state} wikilinkFn={wikilinkFn} /></>}
@@ -354,7 +138,7 @@ function FactsPanel({ rec, wikilinkFn }) {
           {rec.birth.year && <div className="ibx-meta">{rec.birth.year}</div>}
         </Row>
       )}
-      {has(rec.death) && (
+      {hasValue(rec.death) && (
         <Row label="Died">
           {rec.death.city && <Field value={rec.death.city} wikilinkFn={wikilinkFn} />}
           {rec.death.state && <>, <Field value={rec.death.state} wikilinkFn={wikilinkFn} /></>}
@@ -366,7 +150,7 @@ function FactsPanel({ rec, wikilinkFn }) {
           )}
         </Row>
       )}
-      {has(rec.spouse) && <Row label="Spouse"><W v={rec.spouse} /></Row>}
+      {hasValue(rec.spouse) && <Row label="Spouse"><W v={rec.spouse} /></Row>}
       {rec.children_count != null && rec.children_count !== '' && (
         <Row label="Children">{rec.children_count}</Row>
       )}
@@ -383,9 +167,9 @@ function FactsPanel({ rec, wikilinkFn }) {
 
 // ── Career panel ────────────────────────────────────────────────────
 // IMPORTANT: the Lifeline must NEVER render clickable links. Every value here
-// (title, location, party, notes) is printed as plain text, so callers building
-// `events` must strip [[wikilinks]] with stripWL() before passing values in —
-// do not render <Field>/<Link> inside this component.
+// (title, location, party, notes) is printed as plain text; lifeline() in
+// person/record.js strips the [[wikilinks]] — do not render <Field>/<Link>
+// inside this component.
 function Lifeline({ events }) {
   return (
     <div className="ibx-lifeline">
@@ -407,82 +191,15 @@ function Lifeline({ events }) {
 }
 
 function CareerPanel({ rec, wikilinkFn }) {
-  const occ = compact(rec.occupation)
+  const occ = occupations(rec)
   const edu = compact(rec.education)
   const titles = compact(rec.titles)
   const roles = compact(rec.roles)
   const align = rec.political_alignment
-  const parties = [...(Array.isArray(rec.parties) ? rec.parties : []),
-    ...(rec.party ? [rec.party] : [])]
-    .filter((v, i, a) => v && a.indexOf(v) === i)
-  const orgs = [...(Array.isArray(rec.organizations) ? rec.organizations : []),
-    ...(rec.organization ? [rec.organization] : [])]
-    .filter((v, i, a) => v && a.indexOf(v) === i)
+  const parties = partiesOf(rec)
+  const orgs = organizationsOf(rec)
   const military = compact(rec.military_service)
-
-  const events = useMemo(() => {
-    const ev = []
-    if (rec.birth?.year) {
-      ev.push({
-        year: rec.birth.year, kind: 'birth', title: 'Born',
-        location: [rec.birth.city, rec.birth.state, rec.birth.country]
-          .filter(Boolean).map(stripWL).join(', ') || null,
-      })
-    }
-    edu.forEach(e => {
-      if (e.year) ev.push({
-        year: e.year, kind: 'event',
-        title: e.degree || 'Degree',
-        location: e.institution ? stripWL(String(e.institution)) : null,
-      })
-    })
-    titles.forEach(t => {
-      if (t.start) ev.push({
-        year: t.start, kind: 'office',
-        title: t.title ? stripWL(String(t.title)) : 'Title',
-        span: t.end ? `${t.start}–${t.end}` : `${t.start}–?`,
-        location: t.seat ? stripWL(String(t.seat)) : null,
-        party: [
-          t._parties?.length ? t._parties.map(p => stripWL(String(p))).join(', ') : null,
-          t.appointer ? `appt. ${stripWL(String(t.appointer))}` : null,
-        ].filter(Boolean).join(' · ') || null,
-        notes: t.notes || null,
-      })
-    })
-    roles.forEach(r => {
-      if (r.start) ev.push({
-        year: r.start, kind: 'event',
-        title: r.role || 'Role',
-        span: r.end ? `${r.start}–${r.end}` : `${r.start}–?`,
-        location: r.employer ? stripWL(String(r.employer)) : null,
-        notes: r.notes || null,
-      })
-    })
-    military.forEach(m => {
-      const startY = m.start_year
-      if (!startY) return
-      const titleParts = [m.rank, m.branch ? stripWL(String(m.branch)) : null].filter(Boolean)
-      ev.push({
-        year: startY, kind: 'military',
-        title: titleParts.join(', ') || 'Military service',
-        span: m.end_year ? `${startY}–${m.end_year}` : `${startY}–?`,
-        party: m.allegiance ? stripWL(String(m.allegiance)) : null,
-        location: has(m.conflicts)
-          ? compact(m.conflicts).map(c => stripWL(String(c))).join(', ')
-          : null,
-        notes: m.notes || null,
-      })
-    })
-    if (rec.death?.year) {
-      ev.push({
-        year: rec.death.year, kind: 'death',
-        title: rec.death.cause || 'Died',
-        location: [rec.death.city, rec.death.state, rec.death.country]
-          .filter(Boolean).map(stripWL).join(', ') || null,
-      })
-    }
-    return ev.sort((a, b) => a.year - b.year)
-  }, [rec])
+  const events = useMemo(() => lifeline(rec), [rec])
 
   return (
     <div>
@@ -490,18 +207,12 @@ function CareerPanel({ rec, wikilinkFn }) {
         <div className="ibx-section">
           <div className="ibx-section-label">Occupations</div>
           <div>
-            {occ.map((o, i) => {
-              const label = typeof o === 'string' ? o : (o.title || '')
-              const span = typeof o === 'object' && (o.start_year || o.end_year)
-                ? `${o.start_year ?? '?'}–${o.end_year ?? 'present'}`
-                : null
-              return (
-                <span key={i} className="ibx-chip">
-                  {label}
-                  {span && <span className="ibx-meta" style={{ marginLeft: 5 }}>{span}</span>}
-                </span>
-              )
-            })}
+            {occ.map((o, i) => (
+              <span key={i} className="ibx-chip">
+                {o.title}
+                {o.span && <span className="ibx-meta" style={{ marginLeft: 5 }}>{o.span}</span>}
+              </span>
+            ))}
           </div>
         </div>
       )}
@@ -555,7 +266,7 @@ function CareerPanel({ rec, wikilinkFn }) {
         </div>
       )}
 
-      {has(align) && (
+      {hasValue(align) && (
         <div className="ibx-section">
           <div className="ibx-section-label">Political alignment</div>
           <div>
@@ -639,7 +350,7 @@ function LegacyPanel({ rec, wikilinkFn }) {
             {known.map((k, i) => {
               const val = typeof k === 'string' ? k : (k.item ? String(k.item) : null)
               if (!val) return null
-              const wl = parseWL(val)
+              const wl = parseWikilink(val)
               const display = wl ? wl.display : val
               const slug = wl && wikilinkFn ? wikilinkFn(wl.page) : null
               return (
@@ -689,7 +400,7 @@ function LegacyPanel({ rec, wikilinkFn }) {
         </div>
       )}
 
-      {has(eras) && (
+      {hasValue(eras) && (
         <div className="ibx-part-of">
           <div className="ibx-section-label" style={{ padding: '9px 12px 5px' }}>Part of</div>
           <div style={{ padding: '0 12px 12px' }}>
@@ -718,7 +429,7 @@ function RecordPanel({ rec }) {
           <dl className="ibx-charge-grid">
             {c.charged_year && <><dt>Charged</dt><dd>{c.charged_year}</dd></>}
             {c.plea     && <><dt>Plea</dt>    <dd>{c.plea}</dd></>}
-            {c.verdict  && <><dt>Verdict</dt> <dd className={/guilty/i.test(c.verdict) ? 'ibx-guilty' : ''}>{c.verdict}</dd></>}
+            {c.verdict  && <><dt>Verdict</dt> <dd className={isConvicted(c) ? 'ibx-guilty' : ''}>{c.verdict}</dd></>}
             {c.verdict_year && <><dt>Verdict year</dt><dd>{c.verdict_year}</dd></>}
             {c.sentence && <><dt>Sentence</dt><dd>{c.sentence}</dd></>}
             {c.served != null && c.served !== '' && (
@@ -735,10 +446,10 @@ function RecordPanel({ rec }) {
 
 // ── Main export ─────────────────────────────────────────────────────
 export default function PersonInfobox({ meta, title, imageUrl, wikilinkFn }) {
-  const rec = useMemo(() => normalizeMeta(meta), [meta])
-  const tabs = useMemo(() => buildTabs(rec), [rec])
+  const rec = useMemo(() => personRecord(meta), [meta])
+  const tabs = useMemo(() => tabsOf(rec), [rec])
   const [tab, setTab] = useState(() => tabs[0]?.id || 'facts')
-  const stats = useMemo(() => buildQuickStats(rec), [rec])
+  const stats = useMemo(() => quickStatsOf(rec), [rec])
 
   const name = rec.lusitanized_name || rec.native_name || title
 

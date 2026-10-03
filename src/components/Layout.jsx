@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useFileTree } from '../hooks/useVault'
 import { SITE } from '../config'
+import { SIDEBAR_TYPES } from '../utils/articleTypes.js'
 import { useDevTools } from '../hooks/useDevTools'
 
 export default function Layout() {
@@ -67,16 +68,9 @@ export default function Layout() {
           )}
           <div className="sidebar-nav-section">
             <div className="sidebar-nav-label">By Type</div>
-            <Link to="/browse?type=person">People</Link>
-            <Link to="/browse?type=company">Corporations</Link>
-            <Link to="/browse?type=state">States</Link>
-            <Link to="/browse?type=city">Cities</Link>
-            <Link to="/browse?type=country">Countries</Link>
-            <Link to="/browse?type=event">Events</Link>
-            <Link to="/browse?type=law">Legislation</Link>
-            <Link to="/browse?type=institution">Institutions</Link>
-            <Link to="/browse?type=concept">Concepts</Link>
-            <Link to="/browse?type=organization">Organizations</Link>
+            {SIDEBAR_TYPES.map(({ type, label }) => (
+              <Link key={type} to={`/browse?type=${type}`}>{label}</Link>
+            ))}
           </div>
         </nav>
 

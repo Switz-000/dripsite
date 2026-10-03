@@ -1,3 +1,5 @@
+import { typeFromPath } from './articleTypes.js'
+
 // ── Geography hierarchy (Country › State › City) ───────────────────
 // Builds a foldable geographic tree from the vault's country/state/city
 // articles, used by the Birth filter on the Browse page.
@@ -24,20 +26,10 @@ function cleanName(path) {
   return path.split('/').pop().replace(/\.md$/, '').replace(/^\d+\s*-\s*/, '').trim()
 }
 
-function pathSegments(path) {
-  return path.toLowerCase().split('/').slice(0, -1)
-    .map(p => p.replace(/^\d+\s*-\s*/, '').trim())
-}
-
-// Minimal type detector for the three geo types (mirrors BrowsePage's logic
-// for these segments). Returns 'country' | 'state' | 'city' | null.
+// 'country' | 'state' | 'city' | null: the geography types among the folder types.
 export function geoTypeFromPath(path) {
-  const seg = pathSegments(path)
-  const lp = path.toLowerCase()
-  if (seg.includes('states')) return 'state'
-  if (seg.includes('cities')) return 'city'
-  if (lp.includes('rest of the world') || seg.includes('countries')) return 'country'
-  return null
+  const t = typeFromPath(path)
+  return t === 'country' || t === 'state' || t === 'city' ? t : null
 }
 
 // Resolve an article's geo type strictly from the frontmatter `type` field.

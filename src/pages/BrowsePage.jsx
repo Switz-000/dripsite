@@ -3,44 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useFileTree, useClassSchemas, useGeoHierarchy, useFlags, pathToSlug } from '../hooks/useVault'
 import { vault } from '../vault'
 import { flagUrlFor } from '../utils/github'
-import { stripWL } from '../utils/geo'
+import { typeFromPath, pluralLabel } from '../utils/articleTypes.js'
+import {
+  personRecord, occupationTitles, matchesFilters, normalizeFilterValue as normalizeVal, RECORD_STATUSES,
+} from '../person/record.js'
 import { Loading, ErrorState } from '../components/Loading'
-
-// ── Path → type detection ──────────────────────────────────────
-// Handles the "XX - FolderName" naming convention used throughout the vault.
-function getPathSegments(path) {
-  return path
-    .toLowerCase()
-    .split('/')
-    .slice(0, -1)                          // drop filename
-    .map(p => p.replace(/^\d+\s*-\s*/, '').trim())  // strip "01 - " prefix
-}
-
-function hasSegment(segments, name) {
-  return segments.includes(name.toLowerCase())
-}
-
-function guessTypeFromPath(path) {
-  const seg = getPathSegments(path)
-  const lp  = path.toLowerCase()
-
-  if (hasSegment(seg, 'people') || hasSegment(seg, 'characters')) return 'person'
-  if (hasSegment(seg, 'companies') || hasSegment(seg, 'yarnojtes')) return 'company'
-  if (hasSegment(seg, 'states')) return 'state'
-  if (hasSegment(seg, 'cities')) return 'city'
-  if (lp.includes('rest of the world') || hasSegment(seg, 'countries')) return 'country'
-  if (hasSegment(seg, 'history') || hasSegment(seg, 'wars')) return 'event'
-  if (hasSegment(seg, 'legislation')) return 'law'
-  if (hasSegment(seg, 'federal') || hasSegment(seg, 'municipal') ||
-      hasSegment(seg, 'government') || hasSegment(seg, 'goverment')) return 'institution'
-  if (hasSegment(seg, 'organizations') || hasSegment(seg, 'parties')) return 'organization'
-  if (hasSegment(seg, 'religion')) return 'religion'
-  if (hasSegment(seg, 'traditions')) return 'tradition'
-  if (hasSegment(seg, 'sport') || seg.some(s => s.includes('crolball'))) return 'sport'
-  if (hasSegment(seg, 'culture') || hasSegment(seg, 'philosophy') ||
-      hasSegment(seg, 'expressions')) return 'concept'
-  return ''
-}
 
 // ── Helpers ────────────────────────────────────────────────────
 function cleanTitle(path) {
@@ -55,75 +22,9 @@ function cleanFolder(path) {
     .join(' › ')
 }
 
-const TYPE_LABELS = {
-  person: 'People', company: 'Companies', state: 'States', city: 'Cities',
-  country: 'Countries', event: 'Events', law: 'Laws', institution: 'Institutions',
-  concept: 'Concepts', tradition: 'Traditions', religion: 'Religion',
-  sport: 'Sport', organization: 'Organizations', project: 'Projects',
-}
-
-function typeLabel(type) {
-  return TYPE_LABELS[type] ?? (type.charAt(0).toUpperCase() + type.slice(1) + 's')
-}
-
-// ── Sub-filter value matching ──────────────────────────────────
-function normalizeVal(v) {
-  if (v == null) return ''
-  // strip [[wikilink]] so plain filter options match wikilink-valued fields
-  // (e.g. birth.country: "[[Susia]]"). Idempotent for plain text.
-  return stripWL(v).toLowerCase().trim()
-}
-
-// Derived criminal-record status: "Clean record" | "Convict" | "Acquitted"
-const RECORD_OPTIONS = ['Clean record', 'Convict', 'Acquitted']
-function recordStatus(meta) {
-  const raw = meta.criminal_charges
-  const charges = (Array.isArray(raw) ? raw : (raw != null ? [raw] : []))
-    .filter(c => c && (typeof c === 'object'
-      ? Object.values(c).some(v => v != null && v !== '')
-      : String(c).trim() !== ''))
-  if (charges.length === 0) return 'Clean record'
-  const convicted = charges.some(c => {
-    const v = String((c && typeof c === 'object' ? c.verdict : c) || '').toLowerCase()
-    return /guilty|convict/.test(v) && !/not\s+guilty|acquit/.test(v)
-  })
-  return convicted ? 'Convict' : 'Acquitted'
-}
-
-function articleMatchesSubFilters(meta, activeSubFilters) {
-  for (const [key, selected] of activeSubFilters) {
-    if (selected.size === 0) continue
-
-    // Nested: "parentField.childField"  (e.g. criminal_charges.verdict)
-    if (key.includes('.')) {
-      const [parent, child] = key.split('.')
-      const parentVal = meta[parent]
-      const items = Array.isArray(parentVal) ? parentVal
-        : parentVal && typeof parentVal === 'object' ? [parentVal]
-        : []
-      const match = items.some(item =>
-        item && typeof item === 'object' && selected.has(normalizeVal(item[child]))
-      )
-      if (!match) return false
-    } else if (key === 'record_status') {
-      if (!selected.has(normalizeVal(recordStatus(meta)))) return false
-    } else if (key === 'occupation') {
-      // occupation: array of strings OR {title} objects (or a single value)
-      const raw = meta.occupation
-      const list = Array.isArray(raw) ? raw : (raw != null ? [raw] : [])
-      const titles = list.map(e => (e && typeof e === 'object') ? e.title : e)
-      if (!titles.some(t => selected.has(normalizeVal(t)))) return false
-    } else {
-      // Top-level field — may be scalar or array
-      const fieldVal = meta[key]
-      if (Array.isArray(fieldVal)) {
-        if (!fieldVal.some(v => selected.has(normalizeVal(v)))) return false
-      } else {
-        if (!selected.has(normalizeVal(fieldVal))) return false
-      }
-    }
-  }
-  return true
+// A person is filtered through their record, anyone else through plain frontmatter.
+function filterSubject(type, meta) {
+  return type === 'person' ? personRecord(meta) : meta
 }
 
 // ── Sub-filter panel ───────────────────────────────────────────
@@ -205,7 +106,7 @@ function RecordFilter({ active, onToggle }) {
       <SubFilterRow
         fieldKey="record_status"
         label="Criminal record"
-        options={RECORD_OPTIONS}
+        options={RECORD_STATUSES}
         active={active}
         onToggle={onToggle}
       />
@@ -337,7 +238,7 @@ export default function BrowsePage() {
     if (!tree) return []
     const counts = new Map()
     tree.forEach(f => {
-      const t = guessTypeFromPath(f.path)
+      const t = typeFromPath(f.path)
       if (t) counts.set(t, (counts.get(t) || 0) + 1)
     })
     // Also include types from Class schemas even if no path match yet
@@ -379,15 +280,12 @@ export default function BrowsePage() {
     if (!isPerson || !tree) return []
     const set = new Map() // normalized -> display
     tree.forEach(f => {
-      if (guessTypeFromPath(f.path) !== 'person') return
+      if (typeFromPath(f.path) !== 'person') return
       const meta = vault.peekMeta(f.path)
       if (!meta) return
-      const raw = meta.occupation
-      const list = Array.isArray(raw) ? raw : (raw != null ? [raw] : [])
-      list.forEach(e => {
-        const title = (e && typeof e === 'object') ? e.title : e
+      occupationTitles(personRecord(meta)).forEach(title => {
         const norm = normalizeVal(title)
-        if (norm && !set.has(norm)) set.set(norm, String(title).trim())
+        if (norm && !set.has(norm)) set.set(norm, title)
       })
     })
     return [...set.values()].sort((a, b) => a.localeCompare(b))
@@ -401,7 +299,7 @@ export default function BrowsePage() {
     if (fetchingRef.current.has(selectedType)) return
 
     const paths = tree
-      .filter(f => guessTypeFromPath(f.path) === selectedType)
+      .filter(f => typeFromPath(f.path) === selectedType)
       .map(f => f.path)
 
     if (paths.length === 0) {
@@ -459,7 +357,7 @@ export default function BrowsePage() {
         slug:  pathToSlug(f.path),
         title: cleanTitle(f.path),
         folder: cleanFolder(f.path),
-        type:  guessTypeFromPath(f.path),
+        type:  typeFromPath(f.path),
       }))
       .filter(item => {
         // Type filter
@@ -474,7 +372,7 @@ export default function BrowsePage() {
         if (hasSubFilters) {
           const meta = vault.peekMeta(item.path)
           if (!meta) return true  // not yet loaded — show optimistically
-          return articleMatchesSubFilters(meta, activeSubFilters)
+          return matchesFilters(filterSubject(item.type, meta), activeSubFilters)
         }
         return true
       })
@@ -515,7 +413,7 @@ export default function BrowsePage() {
               onClick={() => handleTypeFilter(type)}
               title={count > 0 ? `${count} articles` : undefined}
             >
-              {typeLabel(type)}
+              {pluralLabel(type)}
               {count > 0 && <span className="filter-btn-count">{count}</span>}
             </button>
           ))}

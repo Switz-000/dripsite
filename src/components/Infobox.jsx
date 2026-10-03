@@ -2,19 +2,6 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 
 const FIELD_CONFIGS = {
-  person: [
-    ['birth_year', 'Born'],
-    ['death_year', 'Died'],
-    ['death_cause', 'Cause'],
-    ['birth_city', 'Birthplace'],
-    ['nationality', 'Nationality'],
-    ['ethnicity', 'Ethnicity'],
-    ['religion', 'Religion'],
-    ['occupation', 'Occupation'],
-    ['party', 'Party'],
-    ['enhanced', 'Enhanced'],
-    ['spouse', 'Spouse'],
-  ],
   company: [
     ['founded', 'Founded'],
     ['founding_place', 'Founded in'],

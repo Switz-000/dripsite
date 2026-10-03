@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
-import { getTypeLabel } from '../utils/markdown'
+import { singularLabel } from '../utils/articleTypes.js'
 import Portrait from '../portrait/Portrait'
 
 export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onMouseLeave, onClose }) {
@@ -17,7 +17,7 @@ export default function WikiPopup({ data, slug, x, y, visible, onMouseEnter, onM
   if (left < 8) left = 8
   if (top  < 8) top  = 8
 
-  const typeLabel = data.type ? getTypeLabel({ type: data.type }) : null
+  const typeLabel = data.type ? singularLabel(data.type) : null
   const summaryHtml = data.summary ? marked.parseInline(data.summary) : ''
 
   const heading = (
